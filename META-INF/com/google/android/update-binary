@@ -33,9 +33,17 @@ print_modname() {
   len=`echo -n $MODNAME | wc -c`
   len=$((len + 2))
   local pounds=`printf "%${len}s" | tr ' ' '*'`
-  ui_print "*******************"
-  ui_print " 	  LAZY"
-  ui_print "*******************"
+  ui_print "-------------------------------------------------"
+  ui_print " 				  LAZY TWEAKS"
+  ui_print " 				  ALL IN ONE OPTIMIZER"
+  ui_print " 				  IF PHONE VIBRATES LAZY NOTIFICATION IS SUPPORTED"
+  ui_print "-------------------------------------------------"
+  ui_print " 				  THANK YOU TO THOSE WHO SUPPORTED ME AND LAZY"
+  ui_print " 				  to the testers, users who submitted logs and feedbacks"
+  ui_print " 				  i hope u get better experience, enjoy!"
+  ui_print " 			------------------------------------"
+  ui_print "--------------------------------------------------"
+  ui_print "--------------------------------------------------"
 }
 
 ##############
