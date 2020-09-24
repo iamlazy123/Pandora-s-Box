@@ -3,6 +3,7 @@
 
 ui_print "[*] Setting executable permissions..."
 set_perm_recursive "$MODPATH/system/bin" root root 0777 0755
+set_perm_recursive "$MODPATH/system/vendor" root root 0777 0644
 
 # Do install-time script execution
 ui_print "DONT FORGET TO INSTALL BUSYBOX! :)"

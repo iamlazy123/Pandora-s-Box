@@ -1,4 +1,4 @@
-!/system/bin/sh
+#!/system/bin/sh
 # Written by Draco (tytydraco @ GitHub)
 
 # Wait for boot to finish completely
