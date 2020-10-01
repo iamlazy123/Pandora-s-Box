@@ -1,13 +1,23 @@
 #!/system/bin/sh
-# Written by Draco (tytydraco @ GitHub)
-
-# Wait for boot to finish completely
-while [[ `getprop sys.boot_completed` -ne 1 ]] && [[ ! -d "/sdcard" ]]
-do
+wait_until_login()
+{
+    # we doesn't have the permission to rw "/sdcard" before the user unlocks the screen
+    while [[ `getprop sys.boot_completed` -ne 1 ]] && [[ ! -d "/sdcard" ]]
+	do
        sleep 1
-done
+	done
 
-# Sleep an additional 60s to ensure init is finished
-sleep 120
+    local test_file="/sdcard/.PERMISSION_TEST"
+    touch "$test_file"
+    while [ ! -f "$test_file" ]; do
+        touch "$test_file"
+        sleep 1
+    done
+    rm "$test_file"
+}
+wait_until_login
+#
+sleep 60
 # Setup tweaks
 lazy
+

@@ -14,10 +14,13 @@ ST_RT="/dev/stune/rt"
 ST_GLOBAL="/dev/stune/"
 cpuS="/dev/cpuset"
 VM="/proc/sys/vm"
+NET="/proc/sys/net"
 FS="/proc/sys/fs"
 KERNEL="/proc/sys/kernel"
 DBG="/sys/kernel/debug"
 BOOST="sys/module/cpu_boost/parameters"
+RAM=$(free -m | awk '/RAM:/{print $2}')
+MODE=$(cat /sdcard/mode.txt)
 #=======================================#
 #=======================================#
 
@@ -25,79 +28,42 @@ if [ ! -e /sdcard/mode.txt ]; then
  echo "0" > /sdcard/mode.txt
 fi
 
+###############################
 rm $LOG
 
-# Log in red
-x() {
-	echo -e "\e[91m[!] $@\e[39m" >> $LOG
-}
+
 
 # Log in white and continue (unnecessary)
 kmsg() {
-	echo -e "[*] $@" >> $LOG
+	echo "[i] $@" >> $LOG
+	echo "[i] $@"
 }
 
-# Safely write value to file
-_ctl() {
+ctl() {
 	# Bail out if file does not exist
 	[[ ! -f "$1" ]] && return 1
 
-	# Fetch the current key value
-	local curval=`cat "$1" 2> /dev/null`
+	# Make file writable in case it is not already
+	chmod +w "$1" 2> /dev/null
 
-	# Bail out if value is already set
-	[[ "$curval" == "$2" ]] && return 0
-
-	# Write the new value
-	echo "$2" > "$1" 2> /dev/null
-
-	# Bail out if ctl fails
-	if [[ $? -ne 0 ]]
+	# Write the new value and bail if there's an error
+	if ! echo "$2" > "$1" 2> /dev/null
 	then
-		x "Failed to ctl $2 to $1.Skipping."
+		kmsg "Failed: $1 → $2"
 		return 1
 	fi
 
-	kmsg "$1: $curval => $2"
+	# Log the success
+	kmsg "$1 → $2"
 }
 
-# Background fork ctl function
-ctl() {
-	if [[ "$SYNC" -eq 1 ]]
-	then
-		_ctl $@
-	else
-		_ctl $@ &
-	fi
-}
+# Check for root permissions and bail if not granted
+if [[ "$(id -u)" -ne 0 ]]
+then
+	echo "No root permissions. Exiting."
+	exit 1
+fi
 
-usage() {
-	echo -n "Usage: `basename $0` [OPTIONS]
-Options:
-  -s			Synchronous mode
-  -h			Show usage
-"
-}
-
-# Check for root permissions
-[[ `id -u` -ne 0 ]] && x "No root permissions. Exiting."
-
-while getopts ":sh" opt; do
-	case $opt in
-		s)
-			SYNC=1
-			;;
-		h)
-			usage
-			exit 0
-			;;
-		*)
-			usage
-			exit 1
-			;;
-	esac
-done
-shift $((OPTIND-1))
 
 # Print device information prior to execution
 # Kernel and device information
@@ -122,8 +88,6 @@ kmsg "YOU CAN CHANGE MODE WHILE WAITING BY CHANGING MODE.TXT AT /SDCARD/mode.txt
 [[ -d "/sys/module/cpu_boost" ]] && kmsg "CAF CPU boost detected." 
 kmsg "---------------------------------" 
 
-MODE=$(cat /sdcard/mode.txt)
-
 if [ "$MODE" -eq "1" ]; then 
 kmsg "GAMING MODE ACTIVATED" 
 kmsg "---------------------------------" 
@@ -138,17 +102,18 @@ kmsg "POWER SAVER MODE ACTIVATED"
 kmsg "---------------------------" 
 fi
 
+for _ in $(seq 2)
+do
+	ctl $KERNEL/sched_downmigrate "80 80"
+	ctl $KERNEL/sched_upmigrate "80 80"
+	ctl $KERNEL/sched_group_downmigrate 80
+	ctl $KERNEL/sched_group_upmigrate 80
+done
+
 # Kernel
-_ctl $KERNEL/sched_downmigrate "20 20"
-_ctl $KERNEL/sched_upmigrate "80 80"
-_ctl $KERNEL/sched_group_downmigrate 20
-_ctl $KERNEL/sched_group_upmigrate 80
-ctl $KERNEL/sched_latency_ns 2000000
-ctl $KERNEL/sched_min_granularity_ns 200000
-ctl $KERNEL/sched_wakeup_granularity_ns 200000
-ctl $KERNEL/sched_migration_cost_ns 1500000
-ctl $KERNEL/sched_rt_runtime_us -1
-ctl $KERNEL/perf_cpu_time_max_percent 5
+ctl $KERNEL/perf_event_paranoid 0
+ctl $KERNEL/kptr_restrict 0
+ctl $KERNEL/perf_cpu_time_max_percent 1
 ctl $KERNEL/sched_autogroup_enabled 0
 ctl $KERNEL/sched_child_runs_first 1
 ctl $KERNEL/sched_tunable_scaling 0
@@ -158,51 +123,48 @@ ctl $KERNEL/sched_boost 0
 ctl $KERNEL/sched_nr_migrate 4
 ctl $KERNEL/sched_rr_timeslice_ms 1
 ctl $KERNEL/sched_time_avg_ms 1
+ctl $KERNEL/compat-log 0
+ctl $KERNEL/panic 0
+ctl $KERNEL/softlockup_panic 0
+ctl $KERNEL/panic_on_oops 0
+ctl $KERNEL/sched_latency_ns 5000000
+ctl $KERNEL/sched_min_granularity_ns 500000
+ctl $KERNEL/sched_wakeup_granularity_ns 1000000
+ctl $KERNEL/sched_migration_cost_ns 1000000
+ctl $KERNEL/sched_initial_task_util 0
+ctl $KERNEL/sched_sync_hint_enable 0
 
 for i in $KERNEL/sched_domain/cpu*/domain*/
 do
-ctl "${i}busy_factor" 0
 ctl "${i}cache_nice_tries" 0
 ctl "${i}max_interval" 1
 ctl "${i}min_interval" 1
 ctl "${i}imbalance_pct" 0
+ctl "${i}busy_factor" 0
+ctl "${i}forkexec_idx" 1
+ctl "${i}newidle_idx" 2
+ctl "${i}idle_idx" 2
+ctl "${i}busy_idx" 3
 done
 
 RAM=$(free -m | awk '/Mem:/{print $2}')
 #vm
-ctl $VM/dirty_background_ratio 10
-ctl $VM/dirty_ratio 30
-ctl $VM/vfs_cache_pressure 50
 ctl $VM/oom_kill_allocating_task 0
 ctl $VM/block_dump 0
 ctl $VM/overcommit_memory 1
-ctl $VM/compact_unevictable_allowed 1
-ctl $VM/compact_memory 1
-ctl $VM/dirty_expire_centisecs $(($RAM * 3))
-ctl $VM/dirty_writeback_centisecs $(($RAM * 3))
-ctl $VM/extfrag_threshold 750
+ctl $VM/dirty_expire_centisecs 1221
+ctl $VM/dirty_writeback_centisecs 3664
+ctl $VM/extfrag_threshold 600
+ctl $VM/page-cluster 0
 ctl $VM/oom_dump_tasks 0
 ctl $VM/stat_interval 10
-ctl $VM/swappiness 100
 ctl $VM/panic_on_oom 0
-ctl $VM/laptop_mode 1
 ctl $FS/lease-break-time 5
 ctl $FS/leases-enable 1
-ctl /proc/irq/default_smp_affinity 3f
+ctl $FS/dir-notify-enable 0
+ctl $VM/compact_unevictable_allowed 1
+ctl /proc/irq/default_smp_affinity 0f
 
-
-get_ram()
-{
-    [ "$RAM" -gt 8170 ] && minfree="25600,38400,51200,64000,256000,307200" && efk="204800"
-    [ "$RAM" -le 7144 ] && [ "$RAM" -gt 6120 ] && minfree="25600,38400,51200,64000,153600,179200" && efk="128000"
-    [ "$RAM" -le 6120 ] && [ "$RAM" -gt 4096 ] && minfree="25600,38400,51200,64000,102400,128000" && efk="102400"
-    [ "$RAM" -le 4096 ] && [ "$RAM" -gt 3072 ] && minfree="12800,19200,25600,32000,76800,102400" && efk="76800"
-    [ "$RAM" -le 3072 ] && [ "$RAM" -gt 2048 ] && minfree="12800,19200,25600,32000,51200,76800" && efk="51200"
-    [ "$RAM" -le 2048 ] && [ "$RAM" -gt 1024 ] && minfree="12800,19200,25600,32000,38400,41200" && efk="25600"
-    [ "$RAM" -le 1024 ] && minfree="5120,10240,12800,15360,25600,38400" && efk="19200"
-}
-
-get_ram
 
 #nodes and caches
 ctl $VM/drop_caches 3
@@ -216,13 +178,13 @@ sleep 2
 ctl $VM/drop_caches 3
 
 #Gpu
-ctl /sys/class/kgsl/kgsl-3d0/force_rail_on 1
+ctl /sys/class/kgsl/kgsl-3d0/force_rail_on 0
 ctl /sys/class/kgsl/kgsl-3d0/idle_timer 10000000
-ctl /sys/class/kgsl/kgsl-3d0/force_bus_on 1
+ctl /sys/class/kgsl/kgsl-3d0/force_bus_on 0
 ctl /sys/class/kgsl/kgsl-3d0/devfreq/polling_interval 0
-ctl /sys/class/kgsl/kgsl-3d0/force_clk_on 1
-ctl /sys/class/kgsl/kgsl-3d0/bus_split 0
-echo "1" > /sys/class/kgsl/kgsl-3d0/ppop
+ctl /sys/class/kgsl/kgsl-3d0/force_clk_on 0
+ctl /sys/class/kgsl/kgsl-3d0/bus_split 1
+ctl /sys/class/kgsl/kgsl-3d0/throttling 0
 
 if [ -e  $LMK/oom_reaper ]; then
  chmod 0666 $LMK/oom_reaper;
@@ -230,42 +192,45 @@ if [ -e  $LMK/oom_reaper ]; then
 fi
 chmod 0666 $LMK/adj;
 chmod 0666 $LMK/minfree;
-ctl $LMK/minfree $minfree
-ctl $VM/extra_free_kbytes $efk
-ctl $VM/min_free_kbytes $(($RAM * 2))
+ctl $VM/extra_free_kbytes $(($RAM * 4))
+ctl $VM/min_free_kbytes $RAM
 ctl $LMK/lmk_fast_run 0
 ctl $LMK/enable_adaptive_lmk 0
+ctl $LMK/enable_lmk 0
+
 
 # Scheduler features
 if [[ -f "$DBG/sched_features" ]]
 then
 	ctl $DBG/sched_features NEXT_BUDDY
 	ctl $DBG/sched_features TTWU_QUEUE
-	ctl $DBG/sched_features NO_HRTICK
-	ctl $DBG/sched_features NO_DOUBLE_TICK
-	ctl $DBG/sched_features UTIL_EST
-	ctl $DBG/sched_features ARCH_POWER
-	ctl $DBG/sched_features ARCH_CAPACITY
-fi
+	fi
+	
 #
 for EAS in /sys/devices/system/cpu/cpu*/cpufreq/
 do
 	avail_govs=`cat "${EAS}scaling_available_governors"`
 	if [[ "$avail_govs" == *"schedutil"* ]]
 	then
-		_ctl "${EAS}scaling_governor" schedutil
-		ctl "${EAS}schedutil/up_rate_limit_us" 20000
-		ctl "${EAS}schedutil/down_rate_limit_us" 20000
-		ctl "${EAS}schedutil/rate_limit_us" 20000
+		ctl "${EAS}scaling_governor" schedutil
+		ctl "${EAS}schedutil/up_rate_limit_us" 5000
+		ctl "${EAS}schedutil/down_rate_limit_us" 5000
+		ctl "${EAS}schedutil/rate_limit_us" 5000
 		ctl "${EAS}schedutil/hispeed_load" 90
 		ctl "${EAS}schedutil/hispeed_freq" `cat "${EAS}cpuinfo_max_freq"`
 	elif [[ "$avail_govs" == *"interactive"* ]]
 	then
-		_ctl "${EAS}scaling_governor" interactive
-		ctl "${EAS}interactive/min_sample_time" 20000
+		ctl "${EAS}scaling_governor" interactive
+		ctl "${EAS}interactive/min_sample_time" 5000
 		ctl "${EAS}interactive/go_hispeed_load" 90
 		ctl "${EAS}interactive/hispeed_freq" `cat "${EAS}cpuinfo_max_freq"`
 	fi
+done
+
+for i in /sys/devices/system/cpu/cpu*/core_ctl
+do
+		ctl "${i}/busy_down_thres" 10
+		ctl "${i}/busy_up_thres" 20
 done
 
 for queue in /sys/block/*/queue/
@@ -275,32 +240,33 @@ do
 	do
 		if [[ "$avail_scheds" == *"$sched"* ]]
 		then
-			_ctl "${queue}scheduler" "$sched"
+			ctl "${queue}scheduler" "$sched"
 			break
 		fi
 	done
 	ctl "${queue}iostats" 0
 	ctl "${queue}add_random" 0
-	ctl "${queue}rq_affinity" 1
+	ctl "${queue}rq_affinity" 2
 	ctl "${queue}rotational" 0
-	echo "8108" > "${queue}discard_max_bytes"
-	echo "4" > "${queue}nr_requests"
-	ctl "${queue}nomerges" 2
+	ctl "${queue}nomerges" 1
 done
 
 for queue in /sys/block/ram*/queue/
 do
 	ctl "${queue}read_ahead_kb" 0
+	ctl "${queue}nomerges" 2
 done
 
 for queue in /sys/block/zram*/queue/
 do
 	ctl "${queue}read_ahead_kb" 0
+	ctl "${queue}nomerges" 2
 done
 
 for queue in /sys/block/loop*/queue/
 do
 	ctl "${queue}read_ahead_kb" 0
+	ctl "${queue}nomerges" 2
 done
 
 # Flash storages doesn't comes with any back seeking problems, so set this as low as possible for performance;
@@ -308,27 +274,24 @@ for i in /sys/block/*/queue/iosched
 do
   ctl "$i/back_seek_max" 12582912
   ctl "$i/back_seek_penalty" 1
-  ctl "$i/quantum" 4
-  ctl "$i/fifo_expire_async" 512
-  ctl "$i/fifo_expire_sync" 128
+  ctl "$i/quantum" 16
+  ctl "$i/fifo_expire_async" 330
+  ctl "$i/fifo_expire_sync" 25
   ctl "$i/group_idle" 0
   ctl "$i/group_idle_us" 0
   ctl "$i/low_latency" 1
-  ctl "$i/slice_async" 32
+  ctl "$i/slice_async" 20
   ctl "$i/slice_async_rq" 4
   ctl "$i/slice_idle" 0
   ctl "$i/slice_idle_us" 0
-  ctl "$i/slice_sync" 59
-  ctl "$i/target_latency" 100
-  ctl "$i/target_latency_us" 100000
+  ctl "$i/slice_sync" 29
 done
 
 ext4="/sys/fs/ext4/*"
 	for ext4b in $ext4
 	do
              ctl ${ext4b}/inode_readahead_blks 64
-             ctl ${ext4b}/mb_group_prealloc 64
-             ctl $ext4b/inode_goal 8
+             ctl ${ext4b}/inode_goal 8
              ctl ${ext4b}/mb_max_to_scan 0
              ctl ${ext4b}/mb_min_to_scan 0
              ctl ${ext4b}/extent_max_zeroout_kb 0
@@ -336,53 +299,7 @@ ext4="/sys/fs/ext4/*"
              ctl ${ext4b}/mb_order2_req 0
  done
  
-###############################
-# Powermodes helper functions
-###############################
-
-# $1:keyword $2:nr_max_matched
-get_package_name_by_keyword()
-{
-echo "$(pm list package | grep "$1" | head -n "$2" | cut -d: -f2)"
-}
-
-# $1:"min_cpus" $2:"0:4 4:4"
-set_corectl_param()
-{
-local key
-local val
-for kv in $2; do
-key=${kv%:*}
-val=${kv#*:}
-ctl $CPU/cpu$key/core_ctl/$1 $val
-done
-}
-# $1:"min_cpus" $2:"0:4 4:4"
-set_hotplug()
-{
-local key
-local val
-for kv in $2; do
-key=${kv%:*}
-val=${kv#*:}
-ctl $CPU/cpu$key/$1 $val
-done
-}
-# $1:"schedutil/pl" $2:"0:1 4:1"
-set_governor_param()
-{
-local key
-local val
-for kv in $2; do
-key=${kv%:*}
-val=${kv#*:}
-ctl $CPU/cpu$key/cpufreq/$1 $val
-done
-}
-###############################
 # Cgroup functions
-###############################
-
 # $1:task_name $2:cgroup_name $3:"cpuset"/"stune"
 change_task_cgroup()
 {
@@ -431,20 +348,63 @@ done
 done
 }
 
-# treat crtc_commit as background, avoid display preemption on big
-change_task_cgroup "crtc_commit" "system-background" "cpuset"
+# $1:process_name $2:cgroup_name $3:"cpuset"/"stune"
+change_proc_cgroup()
+{
+    # avoid matching grep itself
+    # ps -Ao pid,args | grep kswapd
+    # 150 [kswapd0]
+    # 16490 grep kswapd
+    local ps_ret
+    ps_ret="$(ps -Ao pid,args)"
+    for temp_pid in $(echo "$ps_ret" | grep "$1" | awk '{print $1}'); do
+        echo $temp_pid > "/dev/$3/$2/cgroup.procs"
+    done
+}
 
-# fix laggy bilibili feed scrolling
+# $1:task_name $2:thread_name $3:cgroup_name $4:"cpuset"/"stune"
+change_thread_cgroup()
+{
+    # avoid matching grep itself
+    # ps -Ao pid,args | grep kswapd
+    # 150 [kswapd0]
+    # 16490 grep kswapd
+    local ps_ret
+    ps_ret="$(ps -Ao pid,args)"
+    for temp_pid in $(echo "$ps_ret" | grep "$1" | awk '{print $1}'); do
+        for temp_tid in $(ls "/proc/$temp_pid/task/"); do
+            if [ "$(grep "$2" /proc/$temp_pid/task/$temp_tid/comm)" != "" ]; then
+                echo "$temp_tid" > "/dev/$4/$3/tasks"
+            fi
+        done
+    done
+}
+
+ctl /proc/sys/fs/inotify/max_queued_events 131072
+ctl /proc/sys/fs/inotify/max_user_watches 131072
+ctl /proc/sys/fs/inotify/max_user_instances 1024
+
+# cgroup
 change_task_cgroup "servicemanager" "top-app" "cpuset"
 change_task_cgroup "servicemanager" "foreground" "stune"
 change_task_cgroup "android.phone" "top-app" "cpuset"
 change_task_cgroup "android.phone" "foreground" "stune"
-
-# reduce render thread waiting time
 change_task_cgroup "surfaceflinger" "top-app" "cpuset"
 change_task_cgroup "surfaceflinger" "foreground" "stune"
 change_task_cgroup "system_server" "top-app" "cpuset"
 change_task_cgroup "system_server" "foreground" "stune"
+change_task_cgroup "kswapd0" "foreground" "cpuset"
+change_task_cgroup "oom_reaper" "foreground" "cpuset"
+change_proc_cgroup "system_server" "top-app" "cpuset"
+change_proc_cgroup "system_server" "foreground" "stune"
+
+#
+change_thread_cgroup "system_server" "android.anim" "top-app" "stune"
+change_thread_cgroup "system_server" "android.anim.lf" "top-app" "stune"
+change_thread_cgroup "system_server" "android.ui" "top-app" "stune"
+
+# ...and pin HeapTaskDaemon on LITTLE
+change_thread_cgroup "system_server" "HeapTaskDaemon" "background" "cpuset"
 
 # reduce big cluster wakeup, eg. android.hardware.sensors@1.0-service
 change_task_affinity ".hardware." "0f"
@@ -453,10 +413,8 @@ change_task_affinity ".hardware.biometrics.fingerprint" "ff"
 change_task_affinity ".hardware.camera.provider" "ff"
 
 #changing cgroup of memory killer 
-change_task_affinity "kswapd" "7f"
+change_task_affinity "kswapd0" "7f"
 change_task_affinity "oom_reaper" "7f"
-change_task_cgroup "kswapd" "foreground" "cpuset"
-change_task_cgroup "oom_reaper" "foreground" "cpuset"
 change_task_nice "kswapd0" "1"
 change_task_nice "oom_reaper" "-2"
 change_task_nice "system_server" "-6"
@@ -464,21 +422,19 @@ change_task_nice "launcher" "-6"
 change_task_nice "trebuchet" "-6"
 change_task_nice "inputmethod" "-3"
 change_task_nice "fluid" "-9"
-change_task_nice "composer" "-10"
+change_task_nice "composer" "-9"
 change_task_nice "com.android.phone" "-3"
 change_task_nice "ksmd" "1"
 change_task_nice "msm_irqbalance" "-5"
 change_task_nice "kgsl_worker" "-9"
 change_task_nice "android.gms" "1"
-
-# reduce big cluster wakeup, eg. android.hardware.sensors@1.0-service
-change_task_affinity "surfaceflinger" "ff"
+change_task_nice "android.vending" "1"
 change_task_nice "surfaceflinger" "-10"
-  
+
 # unify schedtune misc
 # android 10 doesn't have schedtune.sched_boost_enabled exposed, default = true
 #BACKGROUND
-ctl $ST_BACK/schedtune.boost -12
+ctl $ST_BACK/schedtune.boost 0
 ctl $ST_BACK/schedtune.colocate 0
 ctl $ST_BACK/schedtune.prefer_idle 0
 ctl $ST_BACK/schedtune.sched_boost_enabled 0
@@ -496,8 +452,8 @@ ctl $ST_RT/schedtune.prefer_idle 0
 ctl $ST_RT/schedtune.sched_boost_enabled 1
 ctl $ST_RT/schedtune.sched_boost_no_override 0
 #TOP-APP
-ctl $ST_TOP/schedtune.boost 27
-ctl $ST_TOP/schedtune.colocate 1
+ctl $ST_TOP/schedtune.boost 8
+ctl $ST_TOP/schedtune.colocate 0
 ctl $ST_TOP/schedtune.prefer_idle 1
 ctl $ST_TOP/schedtune.sched_boost_enabled 1
 ctl $ST_TOP/schedtune.sched_boost_no_override 1
@@ -513,46 +469,65 @@ ctl /dev/blkio/blkio.weight 1000
 ctl /dev/blkio/background/blkio.weight 100
 ctl /dev/blkio/blkio.blkio.group_idle 0
 ctl /dev/blkio/background/blkio.group_idle 0
-
 ctl $LPM/lpm_prediction N
 ctl $LPM/sleep_disabled N
-set_corectl_param "busy_down_thres" "0:20"
-set_corectl_param "busy_up_thres" "0:80"
-set_corectl_param "busy_down_thres" "4:20"
-set_corectl_param "busy_up_thres" "4:80"
+ctl $LPM/bias_hyst 25
+
 kmsg "--------------------------------------------------" 
 kmsg "LAZY IS STARTING.... ~~ " 
 kmsg "--------------------------------------------------" 
 change_mode() {
 	MODE=$(cat /sdcard/mode.txt)
     if [[ $MODE -eq "3" ]] then
-	set_corectl_param "min_cpus" "0:1 4:1"
-	ctl /sys/devices/platform/soc/1c00000.qcom,kgsl-3d0/kgsl/kgsl-3d0/default_pwrlevel 4
-	ctl /sys/devices/platform/soc/1c00000.qcom,kgsl-3d0/kgsl/kgsl-3d0/min_clock_mhz 320
-	set_hotplug "enable" "0:0 4:1"
-	ADJ1=0; ADJ2=58; ADJ3=117; ADJ4=235; ADJ5=529; ADJ6=1000 
+    ctl "$BOOST/input_boost_freq" 0:1100000
+	ctl "$BOOST/input_boost_ms" 132
+	ctl "$BOOST/sched_boost_on_input" 0
+	ctl $VM/vfs_cache_pressure 50
+	ctl $VM/dirty_background_ratio 3
+	ctl $VM/dirty_ratio 7
+	ctl /sys/devices/platform/soc/1c00000.qcom,kgsl-3d0/kgsl/kgsl-3d0/default_pwrlevel 5
+	Front=$((($RAM*2/100)*1024/4))
+	Visible=$((($RAM*3/100)*1024/4))
+	Second=$((($RAM*4/100)*1024/4))
+	Hidden=$((($RAM*9/100)*1024/4))
+	content=$((($RAM*12/100)*1024/4))
+	empty=$((($RAM*15/100)*1024/4))
+	ADJ1=0; ADJ2=58; ADJ3=117; ADJ4=235; ADJ5=529; ADJ6=1000
 	kmsg "----------------------------------
 	DON'T YOU LOVE BATTERY-CHAN TOO MUCH? :3 ~
 	--------------------------------------" 
 	elif [[ $MODE -eq "2" ]] then
-	set_corectl_param "min_cpus" "0:2 4:2"
-	ctl /sys/devices/platform/soc/1c00000.qcom,kgsl-3d0/kgsl/kgsl-3d0/default_pwrlevel 4
-	ctl /sys/devices/platform/soc/1c00000.qcom,kgsl-3d0/kgsl/kgsl-3d0/min_clock_mhz 400
-	ADJ1=0; ADJ2=58; ADJ3=117; ADJ4=235; ADJ5=529; ADJ6=1000 
+	ctl "$BOOST/input_boost_freq" 0:1400000
+	ctl "$BOOST/input_boost_ms" 132
+	ctl "$BOOST/sched_boost_on_input" 1
+	ctl $VM/vfs_cache_pressure 60
+	ctl $VM/dirty_background_ratio 3
+	ctl $VM/dirty_ratio 15
+	ctl /sys/devices/platform/soc/1c00000.qcom,kgsl-3d0/kgsl/kgsl-3d0/default_pwrlevel 3
+	Front=$((($RAM*1/100)*1024/4))
+	Visible=$((($RAM*2/100)*1024/4))
+	Second=$((($RAM*5/100)*1024/4))
+	Hidden=$((($RAM*7/100)*1024/4))
+	content=$((($RAM*9/100)*1024/4))
+	empty=$((($RAM*11/100)*1024/4))
+	ADJ1=0; ADJ2=58; ADJ3=117; ADJ4=235; ADJ5=529; ADJ6=1000
 	kmsg "-----------------------------
 	DONT MAKE PINE-CHAN WORK TOO MUCH :< ~
 	------------------------------------"
 	elif [[ $MODE -eq "1" ]] then
+	ctl $VM/vfs_cache_pressure 60
+	ctl $VM/dirty_background_ratio 10
+	ctl $VM/dirty_ratio 30
 	ctl "$BOOST/input_boost_freq" 0:1600000
-	ctl "$BOOST/input_boost_ms" 132
+	ctl "$BOOST/input_boost_ms" 250
 	ctl "$BOOST/sched_boost_on_input" 1
-	set_corectl_param "min_cpus" "0:4 4:4"
-	set_governor_param "schedutil/pl" "0:0 4:0"
 	ctl /sys/devices/platform/soc/1c00000.qcom,kgsl-3d0/kgsl/kgsl-3d0/default_pwrlevel 0
-	ctl /sys/devices/platform/soc/1c00000.qcom,kgsl-3d0/kgsl/kgsl-3d0/min_clock_mhz 650
-	ctl $DEVFREQ/$BWMON_CPU_LLC/max_freq 7104
-	ctl $DEVFREQ/$BWMON_LLC_DDR/max_freq 7104
-	ctl $LPM/bias_hyst 100
+	Front=$((($RAM*1/100)*1024/4))
+	Visible=$((($RAM*2/100)*1024/4))
+	Second=$((($RAM*3/100)*1024/4))
+	Hidden=$((($RAM*6/100)*1024/4))
+	content=$((($RAM*7/100)*1024/4))
+	empty=$((($RAM*8/100)*1024/4))
 	ADJ1=0; ADJ2=117; ADJ3=235; ADJ4=529; ADJ5=850; ADJ6=1000 
 	kmsg "-------------------
 	GAMING MODE~
@@ -561,13 +536,16 @@ change_mode() {
 	ctl "$BOOST/input_boost_freq" 0:1600000
 	ctl "$BOOST/input_boost_ms" 132
 	ctl "$BOOST/sched_boost_on_input" 1
-	set_corectl_param "min_cpus" "0:2 4:3"
-	set_governor_param "schedutil/pl" "0:1 4:1"
+	ctl $VM/vfs_cache_pressure 90
+	ctl $VM/dirty_background_ratio 12
+	ctl $VM/dirty_ratio 36
 	ctl /sys/devices/platform/soc/1c00000.qcom,kgsl-3d0/kgsl/kgsl-3d0/default_pwrlevel 4
-	ctl /sys/devices/platform/soc/1c00000.qcom,kgsl-3d0/kgsl/kgsl-3d0/min_clock_mhz 650
-	ctl $DEVFREQ/$BWMON_CPU_LLC/max_freq 7104
-	ctl $DEVFREQ/$BWMON_LLC_DDR/max_freq 7104
-	ctl $LPM/bias_hyst 100
+	Front=$((($RAM*1/100)*1024/4))
+	Visible=$((($RAM*1/100)*1024/4))
+	Second=$((($RAM*3/100)*1024/4))
+	Hidden=$((($RAM*5/100)*1024/4))
+	content=$((($RAM*6/100)*1024/4))
+	empty=$((($RAM*8/100)*1024/4))
 	ADJ1=0; ADJ2=117; ADJ3=235; ADJ4=529; ADJ5=850; ADJ6=1000 
 	kmsg "-------------------
 	LAZY MODE~
@@ -575,20 +553,63 @@ change_mode() {
 	fi
 #
 	ctl $LMK/adj "$ADJ1,$ADJ2,$ADJ3,$ADJ4,$ADJ5,$ADJ6"
+	ctl $LMK/minfree "$Front,$Visible,$Second,$Hidden,$content,$empty"
 }
 
 change_mode
 CURRENTMODE=$MODE
 
-dumpsys deviceidle enable all;
-dumpsys deviceidle enabled all;
-settings put global aggressive_idle_enabled "1"
-settings put global aggressive_standby_enabled "1"
+ctl $NET/core/netdev_max_backlog 128
+ctl $NET/core/netdev_tstamp_prequeue 0
+ctl $NET/ipv4/ipfrag_time 24
+ctl $NET/ipv4/tcp_congestion_control westwood
+ctl $NET/ipv4/tcp_ecn 1
+ctl $NET/ipv4/tcp_fastopen 3
+ctl $NET/ipv4/tcp_sack 1
+ctl $NET/ipv4/tcp_fack 1
+ctl $NET/ipv4/tcp_delayed_ack 0
+ctl $NET/ipv4/tcp_tw_reuse 1
+ctl $NET/ipv4/tcp_dsack 1
+ctl $NET/ipv4/tcp_fwmark_accept 0
+ctl $NET/ipv4/tcp_keepalive_intvl 320
+ctl $NET/ipv4/tcp_keepalive_time 21600
+ctl $NET/ipv4/tcp_no_metrics_save 1
+ctl $NET/ipv4/tcp_slow_start_after_idle 0
+ctl $NET/ipv6/ip6frag_time 48
 
 # Doze battery life profile;
 settings delete global device_idle_constants;
+pm disable --user 0 com.google.android.gms/.phenotype.service.sync.PhenotypeConfigurator;settings put secure location_providers_allowed 
+dumpsys deviceidle enable all
 settings put global device_idle_constants inactive_to=60000,sensing_to=0,locating_to=0,location_accuracy=2000,motion_inactive_to=0,idle_after_inactive_to=0,idle_pending_to=60000,max_idle_pending_to=120000,idle_pending_factor=2.0,idle_to=900000,max_idle_to=21600000,idle_factor=2.0,max_temp_app_whitelist_duration=60000,mms_temp_app_whitelist_duration=30000,sms_temp_app_whitelist_duration=20000,light_after_inactive_to=10000,light_pre_idle_to=60000,light_idle_to=180000,light_idle_factor=2.0,light_max_idle_to=900000,light_idle_maintenance_min_budget=30000,light_idle_maintenance_max_budget=60000;
 dumpsys deviceidle step deep doze;
+
+#Disable collective Device administrators
+pm disable com.google.android.gms/com.google.android.gms.auth.managed.admin.DeviceAdminReceiver
+pm disable com.google.android.gms/com.google.android.gms.mdm.receivers.MdmDeviceAdminReceiver
+
+#Doze Setup Services
+pm disable com.google.android.gms/.ads.AdRequestBrokerService
+pm disable com.google.android.gms/.ads.identifier.service.AdvertisingIdService
+pm disable com.google.android.gms/.ads.social.GcmSchedulerWakeupService
+pm disable com.google.android.gms/.analytics.AnalyticsService
+pm disable com.google.android.gms/.analytics.service.PlayLogMonitorIntervalService
+pm disable com.google.android.gms/.backup.BackupTransportService
+pm disable com.google.android.gms/.thunderbird.settings.ThunderbirdSettingInjectorService
+pm disable com.google.android.gms/.update.SystemUpdateActivity
+pm disable com.google.android.gms/.update.SystemUpdateService
+pm disable com.google.android.gms/.update.SystemUpdateService$ActiveReceiver 
+pm disable com.google.android.gms/.update.SystemUpdateService$Receiver 
+pm disable com.google.android.gms/.update.SystemUpdateService$SecretCodeReceiver
+pm disable com.google.android.gsf/.update.SystemUpdateActivity
+pm disable com.google.android.gsf/.update.SystemUpdatePanoActivity
+pm disable com.google.android.gsf/.update.SystemUpdateService
+pm disable com.google.android.gsf/.update.SystemUpdateService$Receiver
+pm disable com.google.android.gsf/.update.SystemUpdateService$SecretCodeReceiver
+
+for i in $(find /sys/class/net -type l); do
+  ctl $i/tx_queue_len 128
+done
 
 #
 kmsg $(date) 
@@ -597,6 +618,7 @@ kmsg "LAZY HAS EXECUTED TASK SUCCESSFULLY. ENJOY! I'LL BE LISTENING FOR MODE CHA
     if [ -e /sys/class/leds/vibrator/duration ] &&  [ -e /sys/class/leds/vibrator/activate ];then
                 echo 400 > /sys/class/leds/vibrator/duration && echo 1 > /sys/class/leds/vibrator/activate
             fi
+(            
 while true
 do
 sleep 15
@@ -608,5 +630,13 @@ if [ $MODE -ne $CURRENTMODE ]; then
 	CURRENTMODE=$MODE
 fi
 done
-
-    
+)&
+(
+while true; do
+ sleep 15
+ if [ $(top -n 1 -d 1 | head -n 12 | grep -o -e 'ubisoft' -e 'tencent' -e 'mobile' -e 'gameloft' -e 'garena' | head -n 1) ]; then
+  echo "1" > /sdcard/mode.txt
+  kmsg "Game detected. activating gaming mode."
+ fi;
+done
+)&
