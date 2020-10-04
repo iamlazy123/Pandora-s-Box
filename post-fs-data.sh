@@ -14,21 +14,57 @@ echo $SIZE > /sys/block/zram0/disksize
 mkswap /dev/block/zram0 > /dev/null 2>&1
 swapon /dev/block/zram0 > /dev/null 2>&1
 #
-setprop sys.use_fifo_ui 1
-setprop windowsmgr.max_events_per_sec 300
 setprop dalvik.vm.dex2oat-swap true
 setprop dalvik.vm.gc.overwritefree true
 setprop wifi.supplicant_scan_interval 360
 setprop ADRENO_PROFILER_ENABLE_OPENCL 1
+setprop ro.ril.set.mtu1472=1
+setprop ro.mot.eri.losalert.delay=2000
+setprop persist.cust.tel.eons=1
+setprop ro.config.hw_fast_dormancy=1
+setprop ro.ril.gprsclass=10
+setprop ro.ril.hsdpa.category=8
+setprop ro.ril.hsupa.category=6
+setprop ro.ril.hsxpa=2
+
 #
 setprop dalvik.vm.boot-dex2oat-threads $CPUS
 setprop ro.sys.fw.dex2oat_thread_count $CPUS
+setprop dalvik.vm.dexopt-flags m=y,v=n,o=v
+setprop sys.use_fifo_ui 1
 setprop dalvik.vm.checkjni false
 setprop dalvik.vm.verify-bytecode false
 setprop dalvik.vm.execution-mode int:jit
 setprop dalvik.vm.lockprof.threshold 500
-setprop ro.malloc.impl jemalloc
+setprop ADRENO_PROFILER_ENABLE_BLOCKING 1
+setprop dalvik.vm.dex2oat-filter speed
+setprop dalvik.vm.image-dex2oat-filter --no-watch-dog
+setprop dalvik.vm.dexopt-data-only 1
+setprop dalvik.vm.verify-bytecode false
+setprop dalvik.vm.stack-trace-file /data/anr/traces.txt
+setprop dalvik.vm.jmiopts forcecopy
+setprop dalvik.vm.check-dex-sum false
+setprop dalvik.vm.deadlock-predict off
+setprop dalvik.vm.dex2oat-minidebuginfo false
+setprop dalvik.vm.usejit true
+setprop dalvik.vm.dex2oat-flags --no-watch-dog
+setprop dalvik.vm.dexopt.secondary true
+setprop pm.dexopt.first-boot speed
+setprop pm.dexopt.boot speed
+setprop pm.dexopt.install quicken
+setprop pm.dexopt.inactive speed
+setprop persist.sys.dalvik.multithread true
+setprop persist.sys.dalvik.hyperthreading true
+setprop pm.dexopt.bg-dexopt speed
+setprop pm.dexopt.shared speed
 #
+setprop vendor.perf.gestureflingboost.enable true
+setprop vendor.iop.enable_iop 1
+setprop vendor.iop.enable_uxe 1
+setprop vendor.perf.iop_v3.enable 1
+setprop vendor.perf.iop_v3.enable.debug 1
+setprop vendor.enable.prefetch 1
+setprop vendor.iop.enable_prefetch_ofr 1
 setprop ro.hwui.patch_cache_size 384
 setprop ro.hwui.drop_shadow_cache_size 18
 setprop ro.hwui.layer_cache_size 90
@@ -60,9 +96,10 @@ setprop net.tcp.default_init_rwnd 60
 setprop net.tethering.noprovisioning true
 setprop hwui.disable_vsync true
 setprop debug.sf.recomputecrop 0
-setprop debug.force_rtl false
 setprop debug.cpurend.vsync false
 setprop hwui.render_dirty_regions false
+#
+setprop dalvik.vm.heapstartsize 16m
 #
 mount -o remount,nosuid,nodev,noatime,nodiratime,data=writeback -t auto /;
 mount -o remount,nosuid,nodev,noatime,nodiratime -t auto /proc;

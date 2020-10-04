@@ -1,6 +1,6 @@
 id=lazy
 name=Lazy tweaks
-version=v7.2.0
+version=v8
 versionCode=25
 author=lalkendi
-description= Yet Another Optimizer. Transparent, No BS, carefully picked from Redhat, Github, Suse, Linux Documentations and Android Researches. Adjusted, tested to Android.
+description= Yet Another Optimizer. Transparent, carefully picked from Redhat, Github, Suse, Linux Documentations and Android Researches. Adjusted, tested to Android.
