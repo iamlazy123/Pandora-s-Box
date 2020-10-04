@@ -120,8 +120,6 @@ ctl "${i}imbalance_pct" 36
 ctl "${i}busy_factor" 1
 done
 
-RAM=$(free -m | awk '/Mem:/{print $2}')
-
 # The OOM killer will scan through the entire tasklist and select a task based on heuristics to kill.
 ctl $VM/oom_kill_allocating_task 0
 
