@@ -1,6 +1,6 @@
 id=lazy
-name=Lazy tweaks
-version=v8
+name=Lazy Tweaks
+version=Beako
 versionCode=25
 author=lalkendi
 description= Yet Another Optimizer. Transparent, carefully picked from Redhat, Github, Suse, Linux Documentations and Android Researches. Adjusted, tested to Android.
