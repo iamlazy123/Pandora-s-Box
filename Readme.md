@@ -66,11 +66,13 @@ ctl /proc/irq/default_smp_affinity 0f
 
 # Balanced CPUSET for efficiency
 ctl $CSET/foreground/cpus "0-6"
+
 ctl $CSET/background/cpus "0-3"
+
 ctl $CSET/restricted/cpus "0-3"
 
-for i in $KERNEL/sched_domain/cpu*/domain*/
-do
+#for i in $KERNEL/sched_domain/cpu*/domain*/
+
 # Leave cache hot tasks for # tries
 ctl "${i}cache_nice_tries" 0
 # Maximum balance interval ms
@@ -81,9 +83,6 @@ ctl "${i}min_interval" 1
 ctl "${i}imbalance_pct" 0
 # Set busy_factor to 0, so it will give more chance for active load balance for migration running tasks.
 ctl "${i}busy_factor" 0
-done
-
-RAM=$(free -m | awk '/Mem:/{print $2}')
 
 # The OOM killer will scan through the entire tasklist and select a task based on heuristics to kill.
 ctl $VM/oom_kill_allocating_task 0
@@ -114,13 +113,18 @@ ctl $VM/drop_caches 3
 
 # Disable aggressive lmk/s
 ctl $LMK/lmk_fast_run 0
+
 ctl $LMK/enable_adaptive_lmk 0
 
 #GPU Tunables
 ctl /sys/class/kgsl/kgsl-3d0/force_rail_on 0
+
 ctl /sys/class/kgsl/kgsl-3d0/force_clk_on 0
+
 ctl /sys/class/kgsl/kgsl-3d0/force_bus_on 0
+
 ctl /sys/class/kgsl/kgsl-3d0/devfreq/polling_interval 0
+
 ctl /sys/class/kgsl/kgsl-3d0/idle_timer 10000000
 
 # Disables GPU Throttling
@@ -139,8 +143,6 @@ ctl $VM/extra_free_kbytes $(($RAM * 4))
 ctl $VM/min_free_kbytes $(($RAM * 2))
 
 # Scheduler features
-if [[ -f "$DBG/sched_features" ]]
-then
 	# Consider scheduling tasks that are eager to run
 	ctl $DBG/sched_features NEXT_BUDDY
 	
@@ -149,30 +151,38 @@ then
 	
 	# Disable Double tick for cache locality
 	ctl $DBG/sched_features NO_DOUBLE_TICK
-	fi
 	
-for i in /sys/devices/system/cpu/cpu*/core_ctl
-do
+#for i in /sys/devices/system/cpu/cpu*/core_ctl
+#do
 		# Tried to match this value to sched migrations
 		ctl "${i}/busy_down_thres" 10
+
 		# Tried to match this value to sched migrations
 		ctl "${i}/busy_up_thres" 20
+
 		# The time to wait for before offline cores when the number of needed CPUs goes down.
 		ctl "${i}/offline_delay_ms" 50
-done
+#done
 
 for queue in /sys/block/*/queue/
 do
 	# Choose the first governor available
+
 	avail_scheds=`cat "${queue}scheduler"`
+
 	for sched in cfq noop kyber bfq mq-deadline none
+
 	do
 		if [[ "$avail_scheds" == *"$sched"* ]]
 		then
+
 			ctl "${queue}scheduler" "$sched"
+
 			break
 		fi
+
 	done
+
 	# Disable I/O statistics accounting
 	ctl "${queue}iostats" 0
 	
@@ -182,13 +192,18 @@ do
 	# limit nr request for latency
 	ctl "${queue}nr_requests" 32
 	
+        # limit heuristic read ahead for latency
 	ctl "${queue}read_ahead_kb" 128
+
 done
 
 # Flash storages doesn't comes with any back seeking problems, so set this as low as possible for performance;
+
 for i in /sys/block/*/queue/iosched
+
 do
-  # set maximum "distance" for backward seeking, for less bs_penalty
+ 
+ # set maximum "distance" for backward seeking, for less bs_penalty
   ctl "$i/back_seek_max" 12582912
   
   # Lower the cost of backward seeking
@@ -209,40 +224,64 @@ do
 done
 
 # EXT4 TUNABLES
+
 ext4="/sys/fs/ext4/*"
+
 	for ext4b in $ext4
-	do
-			 # reduce number of inode table blocks that ext4's inode table readahead algorithm will pre-read into the buffer cache
+	
+          do
+
+            # reduce number of inode table blocks that ext4's inode table readahead algorithm will pre-read into the buffer cache
              ctl ${ext4b}/inode_readahead_blks 64
              
  done
  
 # cgroup
+
 change_proc_cgroup "system_server" "top-app" "cpuset"
+
 change_proc_cgroup "system_server" "foreground" "stune"
+
 #
+
 change_thread_cgroup "system_server" "android.anim" "top-app" "stune"
+
 change_thread_cgroup "system_server" "android.anim.lf" "top-app" "stune"
+
 change_thread_cgroup "system_server" "android.ui" "top-app" "stune"
 
 # reduce big cluster wakeup, eg. android.hardware.sensors@1.0-service
+
 change_task_cgroup ".hardware." "foreground" "cpuset"
+
 change_task_affinity ".hardware." "3f"
-o
+
 # but exclude fingerprint&camera&display service for speed
+
 change_task_cgroup ".hardware.biometrics.fingerprint" "" "cpuset"
+
 change_task_cgroup ".hardware.camera.provider" "" "cpuset"
+
 change_task_cgroup ".hardware.display" "" "cpuset"
+
 change_task_affinity ".hardware.biometrics.fingerprint" "ff"
+
 change_task_affinity ".hardware.camera.provider" "ff"
+
 change_task_affinity ".hardware.display" "ff"
 
 # reduce big cluster wakeup, eg. android.hardware.sensors@1.0-service
+
 change_task_affinity "surfaceflinger" "ff"
+
 change_task_affinity "servicemanager" "ff"
+
 change_task_affinity "system_server" "ff"
+
 change_task_ionice  "surfaceflinger" "7"
+
 change_task_ionice  "servicemanager" "4"
+
 change_task_ionice  "system_server" "4"
 
 # Changing the cgroup of the following PIDs for smoother experience
