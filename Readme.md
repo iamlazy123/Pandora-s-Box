@@ -4,7 +4,7 @@ Another Optimzer.  Transparent, No BS, carefully picked from Redhat, Github, Sus
 # FEATURES
 `ALL IN ONE KERNEL OPTIMIZATIONS` - FROM TOP TO BOTTOM.
 
-# WHAT'S DIFFERENT THIS TIME?[/B]
+# WHAT'S DIFFERENT THIS TIME?
 LAZY TWEAKS IS AN AIO OPTIMIZER, Carefuly researched to bring significant changes to every device out there, simply like a universal kernel. 
 
 # Credits
