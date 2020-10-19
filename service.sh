@@ -1,4 +1,5 @@
 #!/system/bin/sh
+
 wait_until_login()
 {
     # we doesn't have the permission to rw "/sdcard" before the user unlocks the screen
@@ -16,8 +17,6 @@ wait_until_login()
     rm "$test_file"
 }
 wait_until_login
-#
-sleep 120
+sleep 15
 # Setup tweaks
 lazy
-
