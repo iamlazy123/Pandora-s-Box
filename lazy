@@ -17,18 +17,19 @@ KERNEL="/proc/sys/kernel"
 DBG="/sys/kernel/debug"
 BOOST="sys/module/cpu_boost/parameters"
 RAM=$(free -m | awk '/RAM:/{print $2}')
-MODE=$(cat /sdcard/mode.txt)
 CPUS=`grep -c processor /proc/cpuinfo`
 #=======================================#
 #=======================================#
-
+#spectrum
+setprop persist.spectrum.kernel "Lazy"
+setprop spectrum.support 1
 ###############################
 rm $LOG
 
 # Log in white and continue (unnecessary)
 kmsg() {
-	echo -e "[i] $@" >> $LOG
-	echo -e "[i] $@"
+	echo -e "[-] $@" >> $LOG
+	echo -e "[-] $@"
 }
 
 ctl() {
@@ -37,6 +38,9 @@ ctl() {
 
 	# Fetch the current key value
 	local curval=`cat "$1" 2> /dev/null`
+	
+	# Bail out if value is already set
+	[[ "$curval" == "$2" ]] && return 0
 	
 	# Make file writable in case it is not already
 	chmod +w "$1" 2> /dev/null
@@ -64,48 +68,86 @@ then
 	kmsg "No root permissions. Exiting."
 	exit 1
 fi
-
+kmsg "=======================================================================
+		       LAZY X GOWTHER
+============================================================================="
 # Log the date and time for records sake
 kmsg "Time of execution: $(date)"
-
+kmsg `uname -a` 
+[[ -d "/sys/module/cpu_boost" ]] && kmsg "CAF CPU boost detected." 
+kmsg "=======================================================================
+           STARTING KERNEL TWEAKS
+============================================================================="
 # Sync to data in the rare case a device crashes
 sync
 
+for _ in $(seq 2)
+	do
+
+	# Migrate tasks down at this much load
+	ctl $KERNEL/sched_downmigrate "67 67"
+	ctl $KERNEL/sched_group_downmigrate 67
+	
+	# Migrate tasks up at this much load
+	ctl $KERNEL/sched_upmigrate "77 77"
+	ctl $KERNEL/sched_group_upmigrate 77
+	done
+
 # Kernel
-ctl $KERNEL/perf_cpu_time_max_percent 5
-ctl $KERNEL/perf_event_max_sample_rate 10000
-ctl $KERNEL/perf_event_mlock_kb 580
+ctl $KERNEL/sched_latency_ns 6000000 
+ctl $KERNEL/sched_min_granularity_ns 1000000
+ctl $KERNEL/sched_wakeup_granularity_ns 1500000
 ctl $KERNEL/sched_migration_cost_ns 5000000
+ctl $KERNEL/perf_cpu_time_max_percent 15
 ctl $KERNEL/sched_autogroup_enabled 0
 ctl $KERNEL/sched_child_runs_first 0
 ctl $KERNEL/sched_tunable_scaling 0
 ctl $KERNEL/sched_schedstats 0
 ctl $KERNEL/sched_min_task_util_for_boost_colocation 0
-ctl $KERNEL/sched_initial_task_util 0
-ctl $KERNEL/sched_nr_migrate 8
-ctl $KERNEL/sched_rr_timeslice_ms 90
+ctl $KERNEL/sched_nr_migrate 96
+ctl $KERNEL/sched_rr_timeslice_ms 10
 ctl $KERNEL/printk_devkmsg off
 ctl $KERNEL/printk_ratelimit 900
 ctl $KERNEL/printk_ratelimit_burst 5
+ctl $KERNEL/perf_event_max_sample_rate 10000
+ctl $KERNEL/perf_event_mlock_kb 580
+
+for i in $KERNEL/sched_domain/cpu*/domain*/
+do
+ctl "${i}busy_factor" 1
+ctl "${i}cache_nice_tries" 3
+ctl "${i}busy_idx" 3
+ctl "${i}idle_idx" 2
+ctl "${i}newidle_idx" 2
+ctl "${i}forkexec_idx" 1
+ctl "${i}max_interval" 8
+ctl "${i}min_interval" 4
+ctl "${i}imbalance_pct" 0
+done
+
+kmsg "=======================================================================
+         KERNEL OPTIMIZATIONS APPLIED
+============================================================================="
 
 # Scheduler features
 if [[ -f "$DBG/sched_features" ]]
 then
 	ctl $DBG/sched_features NEXT_BUDDY
 	ctl $DBG/sched_features TTWU_QUEUE
-	ctl $DBG/sched_features NO_GENTLE_FAIR_SLEEPERS
-	ctl $DBG/sched_features NO_WAKEUP_PREEMPTION
 	ctl $DBG/sched_features NO_HRTICK
 	ctl $DBG/sched_features NO_DOUBLE_TICK
+	kmsg "=======================================================================
+         OPTIMIZED SCHED_FEATURES
+============================================================================="
 fi
 
 # Disable compat logging
 ctl $KERNEL/compat-log 0
 
 # Balanced CPUSET for efficiency
-ctl $CSET/foreground/cpus "0-6"
-ctl $CSET/background/cpus "0-1"
-ctl $CSET/restricted/cpus "0-1"
+ctl $CSET/foreground/cpus "0-3,6-7"
+ctl $CSET/background/cpus "0-3"
+ctl $CSET/restricted/cpus "0-3"
 
 RAM=$(free -m | awk '/Mem:/{print $2}')
 
@@ -113,22 +155,39 @@ RAM=$(free -m | awk '/Mem:/{print $2}')
 ctl $VM/panic_on_oom 0
 
 # File grace Period
-ctl $FS/lease-break-time 20
+ctl $FS/lease-break-time 10
 
 #vm
 ctl $VM/dirtytime_expire_seconds 44000
 ctl $VM/oom_kill_allocating_task 0
 ctl $VM/block_dump 0
-ctl $VM/page-cluster 0
 ctl $VM/overcommit_memory 1
 ctl $VM/compact_unevictable_allowed 1
 ctl $VM/reap_mem_on_sigkill 1
 ctl $VM/oom_dump_tasks 0
+ctl $VM/extfrag_threshold 750
 ctl $VM/stat_interval 750
 ctl $VM/swappiness 100
 ctl $FS/dir-notify-enable 0
 ctl $FS/leases-enable 1
-ctl /proc/irq/default_smp_affinity 01
+
+# Same as reap_mem_on_sigkill 
+ctl $LMK/oom_reaper 1
+
+# Extra free memory set by system
+ctl $VM/extra_free_kbytes $(($RAM * 8))
+
+# Minimum Free memory in kbytes set by system
+ctl $VM/min_free_kbytes $(($RAM * 2))
+
+# Adj
+ctl $LMK/adj "0,58,117,239,550,1000"
+ctl $LMK/enable_lmk 0
+ctl $LMK/enable_adaptive_lmk 0
+ctl $LMK/lmk_fast_run 0
+kmsg "=======================================================================
+        MEMORY OPTIMIZATIONS APPLIED
+============================================================================="
 
 # EXT4 TUNABLES
 ext4="/sys/fs/ext4/*"
@@ -136,44 +195,72 @@ ext4="/sys/fs/ext4/*"
 	do
 			 # increase number of inode table blocks that ext4's inode table readahead algorithm will pre-read into the buffer cache
              ctl ${ext4b}/inode_readahead_blks 64
-			 ctl $ext4b/mb_group_prealloc 768
+             ctl $ext4b/mb_group_prealloc 128
+             ctl $ext4b/mb_order2_req 0
+             ctl $ext4b/mb_stream_req 0
+             ctl $ext4b/extent_max_zeroout_kb 0
+             ctl $ext4b/mb_min_to_scan 0
+             ctl $ext4b/mb_max_to_scan 0
  done
- 
-# Disables snapshot crashdumper 
-ctl /sys/class/kgsl/kgsl-3d0/snapshot/snapshot_crashdumper 0
-
-# Same as reap_mem_on_sigkill 
-ctl $LMK/oom_reaper 1
-
-# Extra free memory set by system
-ctl $VM/extra_free_kbytes $(($RAM * 4))
-
-# Minimum Free memory in kbytes set by system
-ctl $VM/min_free_kbytes $(($RAM * 3))
-
-# Adj
-ctl $LMK/adj "0,115,255,557,850,1000"
-ctl "$LMK/enable_lmk" "0"
-ctl "$LMK/enable_adaptive_lmk" "0"
+ kmsg "=======================================================================
+         EXT4 OPTIMIZATIONS APPLIED
+============================================================================="
 
 for queue in /sys/block/*/queue/
 do
-	ctl "${queue}rotational" 1
-	ctl "${queue}rq_affinity" 2
+# Choose the first governor available
+	avail_scheds=`cat "${queue}scheduler"`
+	for sched in cfq noop kyber bfq mq-deadline none
+	do
+		if [[ "$avail_scheds" == *"$sched"* ]]
+		then
+			ctl "${queue}scheduler" "$sched"
+			break
+		fi
+	done
+	ctl "${queue}iostats" 0
+	ctl "${queue}add_random" 0
 	ctl "${queue}nomerges" 0
+	done
+	
+for queue in /sys/block/mmc*/queue/
+do
+	ctl "${queue}rq_affinity" 2
+	ctl "${queue}rotational" 0
+done
+
+for queue in /sys/block/ram*/queue/
+do
+	ctl "${queue}rq_affinity" 0
+	ctl "${queue}rotational" 1
+done
+
+for queue in /sys/block/zram*/queue/
+do
+	ctl "${queue}rq_affinity" 0
+	ctl "${queue}rotational" 1
+done
+
+for queue in /sys/block/loop*/queue/
+do
+	ctl "${queue}rq_affinity" 2
+	ctl "${queue}rotational" 1
 done
 
 for i in /sys/block/*/queue/iosched
 do
-  ctl "${i}/back_seek_max" 4294967295
-  ctl "${i}/back_seek_penalty" 1
-  ctl "${i}/group_idle" 1
-  ctl "${i}/low_latency" 1
-  ctl "${i}/slice_idle" 0
-  ctl "${i}/slice_idle_us" 0
-  ctl "${i}/fifo_expire_async" 330
-  ctl "${i}/fifo_expire_sync" 80
+  ctl "$i/back_seek_max" 12582912
+  ctl "$i/quantum" 16
+  ctl "$i/back_seek_penalty" 1
+  ctl "$i/fifo_expire_async" 330
+  ctl "$i/fifo_expire_sync" 80
+  ctl "$i/group_idle" 0
+  ctl "$i/group_idle_us" 0
+  ctl "$i/low_latency" 1
 done
+kmsg "=======================================================================
+         I/O OPTIMIZATIONS APPLIED
+============================================================================="
 
 # Cgroup functions
 # $1:task_name $2:cgroup_name $3:"cpuset"/"stune"
@@ -207,7 +294,21 @@ renice -n "$2" -p "$temp_tid"
 done
 done
 }
-
+# $1:task_name $2:nice(relative to 120)
+change_task_ionice()
+{
+# avoid matching grep itself
+# ps -Ao pid,args | grep kswapd
+# 150 [kswapd0]
+# 16490 grep kswapd
+local ps_ret
+ps_ret="$(ps -Ao pid,args)"
+for temp_pid in $(echo "$ps_ret" | grep "$1" | awk '{print $1}'); do
+for temp_tid in $(ls "/proc/$temp_pid/task/"); do
+ionice -c 2 -n "$2" -p "$temp_tid"
+done
+done
+}
 # $1:task_name $2:thread_name $3:cgroup_name $4:"cpuset"/"stune"
 change_thread_cgroup()
 {
@@ -278,11 +379,21 @@ change_thread_cgroup()
 # cgroup
 change_proc_cgroup "system_server" "top-app" "cpuset"
 change_proc_cgroup "system_server" "foreground" "stune"
+#
+change_thread_cgroup "system_server" "android.anim" "top-app" "stune"
+change_thread_cgroup "system_server" "android.anim.lf" "top-app" "stune"
+change_thread_cgroup "system_server" "android.ui" "top-app" "stune"
 
 # reduce big cluster wakeup, eg. android.hardware.sensors@1.0-service
 change_task_affinity "surfaceflinger" "ff"
 change_task_affinity "servicemanager" "ff"
 change_task_affinity "system_server" "ff"
+change_task_ionice  "surfaceflinger" "7"
+change_task_ionice  "servicemanager" "4"
+change_task_ionice  "system_server" "4"
+
+# reduce big cluster wakeup, eg. android.hardware.sensors@1.0-service
+change_task_cgroup ".hardware." "foreground" "cpuset"
 
 # Changing the cgroup of the following PIDs for smoother experience
 change_task_cgroup "servicemanager" "top-app" "cpuset"
@@ -298,29 +409,48 @@ change_task_cgroup "crtc_commit" "system-background" "cpuset"
 # and pin HeapTaskDaemon on LITTLE
 change_thread_cgroup "system_server" "HeapTaskDaemon" "background" "cpuset"
 
+# changing priority of memory killer 
+change_task_affinity "kswapd" "7f"
+change_task_affinity "kswapd0" "7f"
+change_task_affinity "oom_reaper" "7f"
+change_task_affinity "lmkd" "7f"
+
 # changing priority of system services for less aggressive google services and better services management
-change_task_nice "system_server" "-6"
+change_task_nice "system_server" "-7"
 change_task_nice "launcher" "-6"
 change_task_nice "trebuchet" "-6"
 change_task_nice "inputmethod" "-3"
 change_task_nice "fluid" "-9"
-change_task_nice "composer" "-20"
+change_task_nice "composer" "-10"
 change_task_nice "com.android.phone" "-3"
-change_task_nice "surfaceflinger" "-20"
-change_task_nice "servicemanager" "-6"
-change_task_nice "kswapd" "-2"
+change_task_nice "ksmd" "1"
+change_task_nice "msm_irqbalance" "1"
+change_task_nice "irq" "1"
+change_task_nice "kgsl_worker" "-9"
+change_task_nice "kworker" "-9"
+change_task_nice "android.gms" "1"
+change_task_nice "android.vending" "1"
+change_task_nice "surfaceflinger" "-10"
+change_task_nice ".hardware." "1"
+change_task_nice "servicemanager" "-10"
+change_task_nice "kswapd0" "-2"
+change_task_nice "lmkd" "-2"
 change_task_nice "oom_reaper" "-2"
+
+kmsg "=======================================================================
+         CGROUPS OPTIMIZED
+============================================================================="
 
 # SCHEDTUNE SETTINGS 
 #BACKGROUND
-ctl $ST_BACK/schedtune.boost 0
+ctl $ST_BACK/schedtune.boost 5
 ctl $ST_BACK/schedtune.colocate 0
 ctl $ST_BACK/schedtune.prefer_idle 0
 ctl $ST_BACK/schedtune.sched_boost_enabled 0
 ctl $ST_BACK/schedtune.sched_boost_no_override 0
 
 #FOREGROUND
-ctl $ST_FORE/schedtune.boost 5
+ctl $ST_FORE/schedtune.boost 8
 ctl $ST_FORE/schedtune.colocate 0
 ctl $ST_FORE/schedtune.prefer_idle 1
 ctl $ST_FORE/schedtune.sched_boost_enabled 0
@@ -334,7 +464,7 @@ ctl $ST_RT/schedtune.sched_boost_enabled 0
 ctl $ST_RT/schedtune.sched_boost_no_override 0
 
 #GLOBAL
-ctl $ST_GLOBAL/schedtune.boost 0
+ctl $ST_GLOBAL/schedtune.boost 8
 ctl $ST_GLOBAL/schedtune.colocate 0
 ctl $ST_GLOBAL/schedtune.prefer_idle 0
 ctl $ST_GLOBAL/schedtune.sched_boost_enabled 0
@@ -345,9 +475,13 @@ ctl /dev/blkio/blkio.weight 1000
 ctl /dev/blkio/blkio.leaf_weight 1000
 ctl /dev/blkio/background/blkio.weight 100
 ctl /dev/blkio/background/blkio.leaf_weight 100
-ctl $LPM/lpm_prediction Y
+ctl $LPM/lpm_prediction N
 ctl $LPM/sleep_disabled N
-ctl $LPM/bias_hyst 50
+ctl $LPM/bias_hyst 25
+
+kmsg "=======================================================================
+         SCHEDTUNE OPTIMIZED
+============================================================================="
 
 # reduce bufferfloat
 for i in $(find /sys/class/net -type l); do
@@ -391,70 +525,20 @@ ctl $NET/ipv4/tcp_fastopen 3
 # Prefer latency
 ctl $NET/ipv4/tcp_low_latency 1
 done
+kmsg "=======================================================================
+         NET/TCP OPTIMIZED
+============================================================================="
 
-# Disable KSM to save CPU cycles
-if [ -e '/sys/kernel/mm/uksm/run' ]; then
-kmsg "DISABLING uKSM"
-ctl '/sys/kernel/mm/uksm/run' 0;
-setprop ro.config.uksm.support false;
-elif [ -e '/sys/kernel/mm/ksm/run' ]; then
-kmsg "DISABLING KSM"
-ctl '/sys/kernel/mm/ksm/run' 0;
-setprop ro.config.ksm.support false;
-fi;
-if [ -e '/sys/kernel/fp_boost/enabled' ]; then
-ctl '/sys/kernel/fp_boost/enabled' 1;
-kmsg "ENABLING FINGER PRINT BOOST"
-fi;
-
-# =========
-# GPU Tweaks
-# =========
 if [ -e "/sys/module/adreno_idler" ]; then
-
-	kmsg "ENABLING GPU ADRENO IDLER " 
+	kmsg "=======================================================================
+         GPU TWEAKS APPLIED 
+============================================================================="
 	ctl /sys/module/adreno_idler/parameters/adreno_idler_active "Y"
 	ctl /sys/module/adreno_idler/parameters/adreno_idler_idleworkload "6000"
 	ctl /sys/module/adreno_idler/parameters/adreno_idler_downdifferential '15'
 	ctl /sys/module/adreno_idler/parameters/adreno_idler_idlewait '15'
-	
+	ctl /sys/class/kgsl/kgsl-3d0/snapshot/snapshot_crashdumper 0
 fi
-
-###############################
-# Basic tool functions
-###############################
-
-# $1:value $2:file path
-lock_val() 
-{
-    if [ -f "$2" ]; then
-        chmod 0666 "$2" 2> /dev/null
-        echo "$1" > "$2"
-        chmod 0444 "$2" 2> /dev/null
-    fi
-}
-
-# $1:value $2:file path
-mutate() 
-{
-    if [ -f "$2" ]; then
-        chmod 0666 "$2" 2> /dev/null
-        echo "$1" > "$2"
-    fi
-}
-
-# $1:value $2:list
-has_val_in_list()
-{
-    for item in $2; do
-        if [ "$1" == "$item" ]; then
-            echo "true"
-            return
-        fi
-    done
-    echo "false"
-}
-
 ###############################
 # PATHs
 ###############################
@@ -609,46 +693,43 @@ fscc_add_apex_lib "bouncycastle.jar"
 
 fscc_stop
 fscc_start
-##############################
-# PATHs
-###############################
-
-SFA_REL="$BIN_DIR"
-SFA_NAME="injector"
-SFA_LIB="libsfanalysis.so"
-
-###############################
-# SfAnalysis tool functions
-###############################
-
-sfa_start()
+kmsg "=======================================================================
+       FSCACHE OPTIMIZED AND RUNNING
+============================================================================="
 {
-    # raise inotify limit
-    lock_val "131072" /proc/sys/fs/inotify/max_queued_events
-    lock_val "131072" /proc/sys/fs/inotify/max_user_watches
-    lock_val "1024" /proc/sys/fs/inotify/max_user_instances
-
-    local lib_path
-    if [ "$(is_aarch64)" == "true" ]; then
-        lib_path="/system/lib64/$SFA_LIB"
-    else
-        lib_path="/system/lib/$SFA_LIB"
-    fi
-
-    # fallback to standlone mode
-    [ ! -f "$lib_path" ] && lib_path="$MODULE_PATH/$lib_path"
-    
-    "$MODPATH/bin/$SFA_NAME" "/system/bin/surfaceflinger" "$lib_path" 
-
-    # injection failed. Retry after setting SELinux to permissive
-    if [ "$?" != "0" ]; then
-        #setenforce 0
-        "$MODPATH/bin/$SFA_NAME" "/system/bin/surfaceflinger" "$lib_path" 
-    fi
-}
-
-sfa_start
-
+setprop debug.enabletr true
+setprop debug.performance.tuning 1
+setprop ro.sf.compbypass.enable 0
+setprop debug.overlayui.enable 1
+setprop debug.enabletr true
+setprop hwui.disable_vsync true
+setprop debug.qctwa.preservebuf 1
+setprop debug.egl.hw 1
+setprop debug.sf.hw 0
+setprop debug.egl.profiler 0
+setprop debug.composition.type gpu
+setprop persist.sys.composition.type gpu
+setprop vendor.display.enable_optimize_refresh 1
+setprop vendor.display.disable_ui_3d_tonemap 1
+#art
+setprop pm.dexopt.ab-ota speed-profile
+setprop pm.dexopt.bg-dexopt speed-profile
+setprop pm.dexopt.boot verify
+setprop pm.dexopt.first-boot quicken
+setprop pm.dexopt.install quicken
+setprop dalvik.vm.image-dex2oat-filter speed
+setprop dalvik.vm.dex2oat-filter speed
+setprop dalvik.vm.check-dex-sum false
+setprop dalvik.vm.checkjni false
+setprop dalvik.vm.usejit true
+setprop dalvik.vm.dex2oat-swap true
+setprop dalvik.vm.execution-mode int:jit
+setprop dalvik.vm.lockprof.threshold 500
+#
+} &
+kmsg "=======================================================================
+        GPU AND RUNTIME BPROPS APPLIED
+============================================================================="
 boot_run_once=false
 spectrum_mode=$(getprop persist.spectrum.profile)
 setprop persist.spectrum.profile 0
@@ -659,7 +740,6 @@ do
     if $boot_run_once
     then
         [ "$(getprop persist.spectrum.profile)" == "$spectrum_mode" ] && continue
-        rm $LOG
     else
         boot_run_once=true
     fi
@@ -667,9 +747,9 @@ do
     case "$spectrum_mode" in
        # Lazy Profile
         "0") {
-kmsg "-------------------
-	LAZY MODE STARTING ~
-	------------------------"
+kmsg "=======================================================================
+         LAZY MODE IS STARTING --
+============================================================================="
 #GPU Tunables
 ctl /sys/class/kgsl/kgsl-3d0/devfreq/polling_interval 10
 ctl /sys/class/kgsl/kgsl-3d0/idle_timer 72
@@ -683,27 +763,11 @@ ctl /sys/class/kgsl/kgsl-3d0/bus_split 1
 
 for queue in /sys/block/*/queue/
 do
-	# Choose the first governor available
-	avail_scheds=`cat "${queue}scheduler"`
-	for sched in cfq noop kyber bfq mq-deadline none
-	do
-		if [[ "$avail_scheds" == *"$sched"* ]]
-		then
-			ctl "${queue}scheduler" "$sched"
-			break
-		fi
-	done
-	# Disable I/O statistics accounting
-	ctl "${queue}iostats" 0
-	
-	# Do not use I/O as a source of randomness
-	ctl "${queue}add_random" 0
-	
 	# limit nr request for latency
 	ctl "${queue}nr_requests" 64
 	
 	# Reduce read ahead for less overheads
-	ctl "${queue}read_ahead_kb" 128
+	ctl "${queue}read_ahead_kb" 16
 	
 done
 
@@ -711,50 +775,32 @@ done
 	ctl "$BOOST/input_boost_ms" 132
 	ctl "$BOOST/sched_boost_on_input" 1
 	
-	for _ in $(seq 2)
-	do
-
-	# Migrate tasks down at this much load
-	ctl $KERNEL/sched_downmigrate "30 60"
-	ctl $KERNEL/sched_group_downmigrate 100
-	ctl $KERNEL/sched_downmigrate_boosted 30
-	
-	# Migrate tasks up at this much load
-	ctl $KERNEL/sched_upmigrate "80 90"
-	ctl $KERNEL/sched_group_upmigrate 120
-	ctl $KERNEL/sched_upmigrate_boosted 25
-	done
-	
-
 	for EAS in /sys/devices/system/cpu/cpu*/cpufreq/
 	do
 	avail_govs=`cat "${EAS}scaling_available_governors"`
 	if [[ "$avail_govs" == *"schedutil"* ]]
 	then
-		_ctl "${EAS}scaling_governor" schedutil
-		ctl "${EAS}schedutil/up_rate_limit_us" 2500
-		ctl "${EAS}schedutil/down_rate_limit_us" 10000
-		ctl "${EAS}schedutil/rate_limit_us" 10000
+		ctl "${EAS}scaling_governor" schedutil
+		ctl "${EAS}schedutil/up_rate_limit_us" 500
+		ctl "${EAS}schedutil/down_rate_limit_us" 20000
+		ctl "${EAS}schedutil/rate_limit_us" 20000
 		ctl "${EAS}schedutil/hispeed_load" 90
 		ctl "${EAS}schedutil/hispeed_freq" `cat "${EAS}cpuinfo_max_freq"`
 		ctl "${EAS}schedutil/pl" 1
 	elif [[ "$avail_govs" == *"interactive"* ]]
 	then
-		_ctl "${EAS}scaling_governor" interactive
+		ctl "${EAS}scaling_governor" interactive
 		ctl "${EAS}interactive/min_sample_time" 10000
 		ctl "${EAS}interactive/go_hispeed_load" 90
 		ctl "${EAS}interactive/hispeed_freq" `cat "${EAS}cpuinfo_max_freq"`
 	fi
 	done
 	
-	ctl $VM/vfs_cache_pressure 50
-	ctl $VM/dirty_background_ratio 10
-	ctl $VM/dirty_ratio 30
+	ctl $VM/vfs_cache_pressure 60
+	ctl $VM/dirty_background_ratio 12
+	ctl $VM/dirty_ratio 36
 	ctl $VM/dirty_expire_centisecs 500
-	ctl $VM/dirty_writeback_centisecs 0
-	ctl $VM/extfrag_threshold 750
-	ctl $VM/laptop_mode 0
-	ctl $VM/drop_caches 1
+	ctl $VM/dirty_writeback_centisecs 3000
 	
 	# Pwrlvl of Adreno GPU (0 is max and 6 is less active)
 	ctl /sys/class/kgsl/kgsl-3d0/max_pwrlevel 0
@@ -770,12 +816,13 @@ done
 	Second=$((($RAM*3/100)*1024/4))
 	Hidden=$((($RAM*5/100)*1024/4))
 	content=$((($RAM*7/100)*1024/4))
-	empty=$((($RAM*11/100)*1024/4))
+	empty=$((($RAM*8/100)*1024/4))
 	
 	ctl $LMK/minfree "4096,5120,$Second,$Hidden,$content,$empty"
-	kmsg "-------------------
-	LAZY MODE ACTIVATED ~
-	------------------------"
+	
+	kmsg "=======================================================================
+         LAZY MODE ACTIVATED --
+============================================================================="
 	# Sucess Message
 	kmsg $(date) 
 	kmsg "LAZY HAS EXECUTED TASK SUCCESSFULLY. ENJOY!"
@@ -783,9 +830,9 @@ done
 	};;
 # Performance Profile
         "1") {  	
-  kmsg "-------------------
-	PERFORMANCE MODE STARTING ~
-	------------------------"
+  kmsg "=======================================================================
+         PERFORMANCE MODE IS STARTING --
+============================================================================="
 #GPU Tunables     	
 ctl /sys/class/kgsl/kgsl-3d0/devfreq/polling_interval 36
 ctl /sys/class/kgsl/kgsl-3d0/idle_timer 72
@@ -799,22 +846,6 @@ ctl /sys/class/kgsl/kgsl-3d0/bus_split 1
 
 for queue in /sys/block/*/queue/
 do
-	# Choose the first governor available
-	avail_scheds=`cat "${queue}scheduler"`
-	for sched in cfq noop kyber bfq mq-deadline none
-	do
-		if [[ "$avail_scheds" == *"$sched"* ]]
-		then
-			ctl "${queue}scheduler" "$sched"
-			break
-		fi
-	done
-	# Disable I/O statistics accounting
-	ctl "${queue}iostats" 0
-	
-	# Do not use I/O as a source of randomness
-	ctl "${queue}add_random" 0
-	
 	# limit nr request for latency
 	ctl "${queue}nr_requests" 64
 	
@@ -827,35 +858,22 @@ done
 	ctl "$BOOST/input_boost_ms" 40
 	ctl "$BOOST/sched_boost_on_input" 1
 	
-	for _ in $(seq 2)
-	do
-
-	# Migrate tasks down at this much load
-	ctl $KERNEL/sched_downmigrate "60 60"
-	ctl $KERNEL/sched_group_downmigrate 60
-	ctl $KERNEL/sched_downmigrate_boosted 25
-	
-	# Migrate tasks up at this much load
-	ctl $KERNEL/sched_upmigrate "80 80"
-	ctl $KERNEL/sched_group_upmigrate 80
-	ctl $KERNEL/sched_upmigrate_boosted 25
-	done
 	
 	for EAS in /sys/devices/system/cpu/cpu*/cpufreq/
 	do
 	avail_govs=`cat "${EAS}scaling_available_governors"`
 	if [[ "$avail_govs" == *"schedutil"* ]]
 	then
-		_ctl "${EAS}scaling_governor" schedutil
-		ctl "${EAS}schedutil/up_rate_limit_us" 5000
-		ctl "${EAS}schedutil/down_rate_limit_us" 5000
-		ctl "${EAS}schedutil/rate_limit_us" 5000
+		ctl "${EAS}scaling_governor" schedutil
+		ctl "${EAS}schedutil/up_rate_limit_us" 500
+		ctl "${EAS}schedutil/down_rate_limit_us" 10000
+		ctl "${EAS}schedutil/rate_limit_us" 10000
 		ctl "${EAS}schedutil/hispeed_load" 80
 		ctl "${EAS}schedutil/hispeed_freq" `cat "${EAS}cpuinfo_max_freq"`
 		ctl "${EAS}schedutil/pl" 0
 	elif [[ "$avail_govs" == *"interactive"* ]]
 	then
-		_ctl "${EAS}scaling_governor" interactive
+		ctl "${EAS}scaling_governor" interactive
 		ctl "${EAS}interactive/min_sample_time" 5000
 		ctl "${EAS}interactive/go_hispeed_load" 80
 		ctl "${EAS}interactive/hispeed_freq" `cat "${EAS}cpuinfo_max_freq"`
@@ -865,11 +883,8 @@ done
 	ctl $VM/vfs_cache_pressure 50
 	ctl $VM/dirty_background_ratio 10
 	ctl $VM/dirty_ratio 90
-	ctl $VM/dirty_expire_centisecs 0
+	ctl $VM/dirty_expire_centisecs 500
 	ctl $VM/dirty_writeback_centisecs 0
-	ctl $VM/extfrag_threshold 600
-	ctl $VM/laptop_mode 0
-	ctl $VM/drop_caches 1
 	
 	# Pwrlvl of Adreno GPU (0 is max and 6 is less active)
 	ctl /sys/class/kgsl/kgsl-3d0/max_pwrlevel 0
@@ -881,15 +896,17 @@ done
 	ctl $ST_TOP/schedtune.prefer_idle 0
 	ctl $ST_TOP/schedtune.sched_boost_enabled 0
 	ctl $ST_TOP/schedtune.sched_boost_no_override 0
+	
 	Second=$((($RAM*3/100)*1024/4))
 	Hidden=$((($RAM*4/100)*1024/4))
 	content=$((($RAM*7/100)*1024/4))
-	empty=$((($RAM*11/100)*1024/4))
+	empty=$((($RAM*8/100)*1024/4))
 	
 	ctl $LMK/minfree "4096,5120,$Second,$Hidden,$content,$empty"
-	kmsg "-------------------
-	PERFORMANCE/MULTITASKING MODE ACTIVATED ~
-	------------------------"
+	
+	kmsg "=======================================================================
+         PERFORMANCE MODE ACTIVATED --
+============================================================================="
 	# Sucess Message
 	kmsg $(date) 
 	kmsg "LAZY HAS EXECUTED TASK SUCCESSFULLY. ENJOY!"
@@ -897,9 +914,9 @@ done
 	};;
 	# Battery Profile
         "2") {
-kmsg "-------------------
-	BATTERY MODE STARTING ~
-	------------------------"
+kmsg "=======================================================================
+         BATTERY MODE IS STARTING --
+============================================================================="
 #GPU Tunables     	
 ctl /sys/class/kgsl/kgsl-3d0/devfreq/polling_interval 36
 ctl /sys/class/kgsl/kgsl-3d0/idle_timer 72
@@ -913,21 +930,6 @@ ctl /sys/class/kgsl/kgsl-3d0/bus_split 1
 
 for queue in /sys/block/*/queue/
 do
-	# Choose the first governor available
-	avail_scheds=`cat "${queue}scheduler"`
-	for sched in cfq noop kyber bfq mq-deadline none
-	do
-		if [[ "$avail_scheds" == *"$sched"* ]]
-		then
-			ctl "${queue}scheduler" "$sched"
-			break
-		fi
-	done
-	# Disable I/O statistics accounting
-	ctl "${queue}iostats" 0
-	
-	# Do not use I/O as a source of randomness
-	ctl "${queue}add_random" 0
 	
 	# limit nr request for latency
 	ctl "${queue}nr_requests" 64
@@ -939,51 +941,34 @@ do
 
 	ctl "$BOOST/input_boost_freq" 0:0
 	ctl "$BOOST/input_boost_ms" 0
-	ctl "$BOOST/sched_boost_on_input" 1
-	
-	for _ in $(seq 2)
-	do
-
-	# Migrate tasks down at this much load
-	ctl $KERNEL/sched_downmigrate "100 100"
-	ctl $KERNEL/sched_group_downmigrate 100
-	ctl $KERNEL/sched_downmigrate_boosted 100
-	
-	# Migrate tasks up at this much load
-	ctl $KERNEL/sched_upmigrate "100 100"
-	ctl $KERNEL/sched_group_upmigrate 100
-	ctl $KERNEL/sched_upmigrate_boosted 100
-	done
+	ctl "$BOOST/sched_boost_on_input" 0
 	
 	for EAS in /sys/devices/system/cpu/cpu*/cpufreq/
 	do
 	avail_govs=`cat "${EAS}scaling_available_governors"`
 	if [[ "$avail_govs" == *"schedutil"* ]]
 	then
-		_ctl "${EAS}scaling_governor" schedutil
-		ctl "${EAS}schedutil/up_rate_limit_us" 2500
-		ctl "${EAS}schedutil/down_rate_limit_us" 10000
-		ctl "${EAS}schedutil/rate_limit_us" 10000
-		ctl "${EAS}schedutil/hispeed_load" 99
-		ctl "${EAS}schedutil/hispeed_freq" `cat "${EAS}cpuinfo_max_freq"`
+		ctl "${EAS}scaling_governor" schedutil
+		ctl "${EAS}schedutil/up_rate_limit_us" 5000
+		ctl "${EAS}schedutil/down_rate_limit_us" 20000
+		ctl "${EAS}schedutil/rate_limit_us" 20000
+		ctl "${EAS}schedutil/hispeed_load" 90
+		ctl "${EAS}schedutil/hispeed_freq" 0
 		ctl "${EAS}schedutil/pl" 0
 	elif [[ "$avail_govs" == *"interactive"* ]]
 	then
-		_ctl "${EAS}scaling_governor" interactive
-		ctl "${EAS}interactive/min_sample_time" 10000
-		ctl "${EAS}interactive/go_hispeed_load" 99
-		ctl "${EAS}interactive/hispeed_freq" `cat "${EAS}cpuinfo_max_freq"`
+		ctl "${EAS}scaling_governor" interactive
+		ctl "${EAS}interactive/min_sample_time" 20000
+		ctl "${EAS}interactive/go_hispeed_load" 90
+		ctl "${EAS}interactive/hispeed_freq" 0
 	fi
 	done
 	
 	ctl $VM/vfs_cache_pressure 50
 	ctl $VM/dirty_background_ratio 10
-	ctl $VM/dirty_ratio 30
+	ctl $VM/dirty_ratio 50
 	ctl $VM/dirty_expire_centisecs 3000
 	ctl $VM/dirty_writeback_centisecs 3000
-	ctl $VM/extfrag_threshold 500
-	ctl $VM/laptop_mode 0
-	ctl $VM/drop_caches 2
 	
 	# Pwrlvl of Adreno GPU (0 is max and 6 is less active)
 	ctl /sys/class/kgsl/kgsl-3d0/max_pwrlevel 5
@@ -999,12 +984,13 @@ do
 	Second=$((($RAM*3/100)*1024/4))
 	Hidden=$((($RAM*4/100)*1024/4))
 	content=$((($RAM*7/100)*1024/4))
-	empty=$((($RAM*11/100)*1024/4))
+	empty=$((($RAM*8/100)*1024/4))
 	
 	ctl $LMK/minfree "4096,5120,$Second,$Hidden,$content,$empty"
-	kmsg "-------------------
-	BATTERY MODE ACTIVATED ~
-	------------------------"
+	
+	kmsg "=======================================================================
+         BATTERY MODE ACTIVATED --
+============================================================================="
 	# Sucess Message
 	kmsg $(date) 
 	kmsg "LAZY HAS EXECUTED TASK SUCCESSFULLY. ENJOY!"
@@ -1013,40 +999,25 @@ do
 # Gaming Profile
         "3") {
 #GPU Tunables
-kmsg "-------------------
-	GAMING MODE STARTING ~
-	------------------------"
-ctl /sys/class/kgsl/kgsl-3d0/devfreq/polling_interval 36
+kmsg "=======================================================================
+         GAMING MODE IS STARTING --
+============================================================================="
+ctl /sys/class/kgsl/kgsl-3d0/devfreq/polling_interval 0
 ctl /sys/class/kgsl/kgsl-3d0/idle_timer 1000000
 ctl /sys/class/kgsl/kgsl-3d0/force_clk_on 1
 ctl /sys/class/kgsl/kgsl-3d0/thermal_pwrlevel 0
 ctl /sys/class/kgsl/kgsl-3d0/force_bus_on 1
 ctl /sys/class/kgsl/kgsl-3d0/force_no_nap 1
-ctl /sys/class/kgsl/kgsl-3d0/devfreq/adrenoboost 2
+ctl /sys/class/kgsl/kgsl-3d0/devfreq/adrenoboost 3
 ctl /sys/class/kgsl/kgsl-3d0/force_rail_on 1
 ctl /sys/class/kgsl/kgsl-3d0/bus_split 0
 
 
 for queue in /sys/block/*/queue/
 do
-	# Choose the first governor available
-	avail_scheds=`cat "${queue}scheduler"`
-	for sched in cfq noop kyber bfq mq-deadline none
-	do
-		if [[ "$avail_scheds" == *"$sched"* ]]
-		then
-			ctl "${queue}scheduler" "$sched"
-			break
-		fi
-	done
-	# Disable I/O statistics accounting
-	ctl "${queue}iostats" 0
-	
-	# Do not use I/O as a source of randomness
-	ctl "${queue}add_random" 0
 	
 	# limit nr request for latency
-	ctl "${queue}nr_requests" 256
+	ctl "${queue}nr_requests" 128
 	
 	# Reduce read ahead for less overheads
 	ctl "${queue}read_ahead_kb" 768
@@ -1057,26 +1028,12 @@ done
 	ctl "$BOOST/input_boost_ms" 250
 	ctl "$BOOST/sched_boost_on_input" 1
 	
-	for _ in $(seq 2)
-	do
-
-	# Migrate tasks down at this much load
-	ctl $KERNEL/sched_downmigrate "30 60"
-	ctl $KERNEL/sched_group_downmigrate 60
-	ctl $KERNEL/sched_downmigrate_boosted 30
-	
-	# Migrate tasks up at this much load
-	ctl $KERNEL/sched_upmigrate "70 80"
-	ctl $KERNEL/sched_group_upmigrate 70
-	ctl $KERNEL/sched_upmigrate_boosted 25 
-	done
-	
 	for EAS in /sys/devices/system/cpu/cpu*/cpufreq/
 	do
 	avail_govs=`cat "${EAS}scaling_available_governors"`
 	if [[ "$avail_govs" == *"schedutil"* ]]
 	then
-		_ctl "${EAS}scaling_governor" schedutil
+		ctl "${EAS}scaling_governor" schedutil
 		ctl "${EAS}schedutil/up_rate_limit_us" 500
 		ctl "${EAS}schedutil/down_rate_limit_us" 2000
 		ctl "${EAS}schedutil/rate_limit_us" 2000
@@ -1085,7 +1042,7 @@ done
 		ctl "${EAS}schedutil/pl" 1
 	elif [[ "$avail_govs" == *"interactive"* ]]
 	then
-		_ctl "${EAS}scaling_governor" interactive
+		ctl "${EAS}scaling_governor" interactive
 		ctl "${EAS}interactive/min_sample_time" 2000
 		ctl "${EAS}interactive/go_hispeed_load" 80
 		ctl "${EAS}interactive/hispeed_freq" `cat "${EAS}cpuinfo_max_freq"`
@@ -1097,16 +1054,13 @@ done
 	ctl $VM/dirty_ratio 10
 	ctl $VM/dirty_expire_centisecs 0
 	ctl $VM/dirty_writeback_centisecs 0
-	ctl $VM/extfrag_threshold 500
-	ctl $VM/laptop_mode 0
-	ctl $VM/drop_caches 3
 	
 	# Pwrlvl of Adreno GPU (0 is max and 6 is less active)
 	ctl /sys/class/kgsl/kgsl-3d0/max_pwrlevel 0
 	ctl /sys/class/kgsl/kgsl-3d0/default_pwrlevel 0
 	
 	#TOP-APP
-	ctl $ST_TOP/schedtune.boost 5
+	ctl $ST_TOP/schedtune.boost 10
 	ctl $ST_TOP/schedtune.colocate 0
 	ctl $ST_TOP/schedtune.prefer_idle 1
 	ctl $ST_TOP/schedtune.sched_boost_enabled 1
@@ -1115,12 +1069,12 @@ done
 	Second=$((($RAM*3/100)*1024/4))
 	Hidden=$((($RAM*4/100)*1024/4))
 	content=$((($RAM*8/100)*1024/4))
-	empty=$((($RAM*15/100)*1024/4))
+	empty=$((($RAM*9/100)*1024/4))
 	
 	ctl $LMK/minfree "4096,5120,$Second,$Hidden,$content,$empty"
-	kmsg "-------------------
-	GAMING MODE ACTIVATED ~
-	------------------------"
+	kmsg "=======================================================================
+         GAMING MODE ACTIVATED --
+============================================================================="
 	# Sucess Message
 	kmsg $(date) 
 	kmsg "LAZY HAS EXECUTED TASK SUCCESSFULLY. ENJOY!"
