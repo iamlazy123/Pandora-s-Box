@@ -13,3 +13,6 @@ LAZY TWEAKS IS AN AIO OPTIMIZER, Carefuly researched to bring significant change
 # WHAT DOES IT MODIFIES
 Everything which lazy tweaks modifies are logged at /android/lazy.log. To keep it short, it changes fundamental runtime properties according to your needs. From ram management to your game rendering, lazy tweaks will try to improve it.
 
+# CREDITS:
+@tytydraco for his knowledge and script
+source code: https://github.com/tytydraco/KTweak
