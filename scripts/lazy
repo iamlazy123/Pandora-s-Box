@@ -313,7 +313,6 @@ kmsg "--------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------"
 sync
 auto
-ctl $VM/drop_caches 3
 kmsg "-------------------------------------------------------------------------------------------------------------
        $(date): AUTO MODE ACTIVE
 -------------------------------------------------------------------------------------------------------------------"
@@ -325,7 +324,6 @@ toast
 killall auto
 stop auto
 bal
-ctl $VM/drop_caches 3
 cmode="BALANCED MODE ACTIVATED"
 toast
 	};;
@@ -334,7 +332,6 @@ toast
 killall auto
 stop auto
 lat
-ctl $VM/drop_caches 3
 cmode="LATENCY MODE ACTIVATED"
 toast
 	};;
@@ -343,7 +340,6 @@ toast
 killall auto
 stop auto
 cons
-ctl $VM/drop_caches 3
 cmode="CONSERVATIVE MODE ACTIVATED"
 toast
 	};;
@@ -352,7 +348,6 @@ toast
 killall auto
 stop auto
 through
-ctl $VM/drop_caches 3
 cmode="THROUGHPUT MODE ACTIVATED"
 toast
 };;
