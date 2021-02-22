@@ -1,0 +1,361 @@
+
+#------------------------------------===#
+#VARIABLES------------------------------=#
+LOG=/sdcard/Android/lazy.log
+LPM="/sys/module/lpm_levels/parameters"
+LMK="/sys/module/lowmemorykiller/parameters"
+ST_TOP="/dev/stune/top-app"
+ST_FORE="/dev/stune/foreground"
+ST_BACK="/dev/stune/background"
+ST_RT="/dev/stune/rt"
+ST_GLOBAL="/dev/stune/"
+CSET="/dev/cpuset"
+VM="/proc/sys/vm"
+FS="/proc/sys/fs"
+NET="/proc/sys/net"
+KERNEL="/proc/sys/kernel"
+DBG="/sys/kernel/debug"
+#------------------------------------===#
+#------------------------------------===#
+setprop lazy.support 1
+###############################
+rm $LOG
+
+# Log in white and continue (unnecessary)
+kmsg() {
+	echo -e "[-] $@" >> $LOG
+	echo -e "[-] $@"
+}
+
+ctl() {
+	# Bail out if file does not exist
+	[[ ! -f "$1" ]] && return 1
+
+	# Fetch the current key value
+	local curval=`cat "$1" 2> /dev/null`
+	
+	# Bail out if value is already set
+	[[ "$curval" == "$2" ]] && return 1
+	
+	# Make file writable in case it is not already
+	chmod 777 "$1" 2> /dev/null
+
+	# Write the new value and bail if there's an error
+	if ! echo "$2" > "$1" 2> /dev/null
+	then
+		return 1
+	fi
+
+	# Log the success
+	kmsg "$1 $curval -> $2"
+}
+toast() {
+ am start -a android.intent.action.MAIN -e toasttext "$cmode" -n bellavita.toast/.MainActivity
+}	
+# Check for root permissions and bail if not granted
+if [[ "$(id -u)" -ne 0 ]]
+then
+	kmsg "No root permissions. Exiting."
+	exit 1
+fi
+kmsg "-------------------------------------------------------------------------------------------------------------
+		       LAZY IS STARTING
+-------------------------------------------------------------------------------------------------------------------"
+# Log the date and time for records sake
+kmsg "TIME OF EXECUTION: $(date)"
+kmsg "KERNEL: `uname -a` "
+kmsg "-------------------------------------------------------------------------------------------------------------
+           STARTING KERNEL TWEAKS
+-------------------------------------------------------------------------------------------------------------------"
+# Sync to data in the rare case a device crashes
+sync
+
+settings put global fstrim_mandatory_interval 86400000 # 1 day
+settings put global storage_benchmark_interval 9223372036854775807 # effectively, never
+
+# Scheduler features 
+if [[ -f "$DBG/sched_features" ]]
+then
+	ctl $DBG/sched_features NO_TTWU_QUEUE
+	ctl $DBG/sched_features NEXT_BUDDY
+	ctl $DBG/sched_features NO_GENTLE_FAIR_SLEEPERS
+	ctl $DBG/sched_features NO_LB_BIAS
+	ctl $DBG/sched_features NO_EAS_PREFER_IDLE
+	ctl $DBG/sched_features NO_FIND_BEST_TARGET
+	ctl $DBG/sched_features NO_NONTASK_CAPACITY
+	ctl $DBG/sched_features NO_EAS_USE_NEED_IDLE
+	
+fi
+
+# static kernel parameters
+ctl $KERNEL/sched_schedstats 0
+ctl $KERNEL/sched_nr_migrate 4
+ctl $KERNEL/sched_tunable_scaling 0
+ctl $KERNEL/sched_rr_timeslice_ms 1
+ctl $KERNEL/sched_migration_cost_ns 30000000
+
+RAM=$(free -m | awk '/Mem:/{print $2}')
+# VM
+ctl $VM/oom_kill_allocating_task 1
+ctl $VM/block_dump 0
+ctl $VM/panic_on_oom 0
+ctl $VM/overcommit_memory 1
+ctl $VM/overcommit_ratio 100
+ctl $VM/reap_mem_on_sigkill 1
+ctl $VM/oom_dump_tasks 0
+ctl $VM/stat_interval 20
+ctl $VM/extfrag_threshold 750
+ctl $VM/compact_memory 1
+ctl $VM/page-cluster 0
+ctl $FS/lease-break-time 10
+ctl $FS/leases-enable 1
+ctl $FS/dir-notify-enable 0
+
+parameter_adj=$LMK/adj
+if [ -e $parameter_adj ]; then
+  ctl $parameter_adj "0,58,250,550,850,1000"
+fi
+
+parameter_oom_reaper=$LMK/oom_reaper
+if [ -e $parameter_oom_reaper ]; then
+  ctl $parameter_oom_reaper 1
+fi
+
+parameter_lmk_fast_run=$LMK/lmk_fast_run
+if [ -e $parameter_lmk_fast_run ]; then
+  ctl $parameter_lmk_fast_run 0
+fi
+
+front=$((($RAM*2/100)*1024/4))
+visible=$((($RAM*3/100)*1024/4))
+Second=$((($RAM*5/100)*1024/4))
+Hidden=$((($RAM*6/100)*1024/4))
+content=$((($RAM*7/100)*1024/4))
+empty=$((($RAM*10/100)*1024/4))
+	
+ctl $LMK/minfree "$front,$visible,$Second,$Hidden,$content,$empty"
+kmsg "-------------------------------------------------------------------------------------------------------------
+        MEMORY OPTIMIZATIONS APPLIED
+-------------------------------------------------------------------------------------------------------------------"
+# TCP Congestion Control
+tcp="/proc/sys/net/ipv4/"
+avail_con=`cat "${tcp}tcp_available_congestion_control"`
+	for con in bbr2 bbr cubic westwood 
+	do
+		if [[ "$avail_con" == *"$con"* ]]
+		then
+			ctl $NET/ipv4/tcp_congestion_control $con
+			break
+		fi
+	done
+# Enable select acknowledgments
+ctl $NET/ipv4/tcp_sack 1
+# Increase the tcp-time-wait buckets pool size to prevent simple DOS attacks 
+ctl $NET/ipv4/tcp_tw_reuse 1
+# Turn on window scaling which can enlarge the transfer window:
+ctl $NET/ipv4/tcp_window_scaling 1
+# Do not cache metrics on closing connections 
+ctl $NET/ipv4/tcp_no_metrics_save 1
+# Disable SYN cookies
+ctl $NET/ipv4/tcp_syncookies 0
+# Enable Explicit Congestion Control
+ctl $NET/ipv4/tcp_ecn 1
+# Enable fast socket open for receiver and sender
+ctl $NET/ipv4/tcp_fastopen 3
+# Prefer latency
+ctl $NET/ipv4/tcp_low_latency 1
+kmsg "-------------------------------------------------------------------------------------------------------------
+        TCP OPTIMIZED
+-------------------------------------------------------------------------------------------------------------------"
+ctl /sys/kernel/rcu_expedited 0
+ctl /sys/kernel/rcu_normal 1
+ctl /proc/sys/dev/tty/ldisc_autoload 0
+ctl /proc/sys/net/core/netdev_tstamp_prequeue 0
+ctl /sys/module/msm_performance/parameters/touchboost 1
+#based on mvk's principle for cpu_input boosting
+ctl /sys/module/cpu_input_boost/parameters/input_boost_freq_hp 1400000
+ctl /sys/module/cpu_input_boost/parameters/input_boost_duration 58
+ctl /sys/module/cpu_input_boost/parameters/input_boost_freq_lp 0
+ctl /sys/module/cpu_boost/parameters/input_boost_freq "0:1400000 1:0 2:0 3:0 4:0 5:0 6:0 7:0"
+ctl /sys/module/cpu_boost/parameters/input_boost_ms 58
+ctl /sys/kernel/fast_charge/force_fast_charge 1
+
+	#based from zenith kernel's core control
+	for corectl in /sys/devices/system/cpu/cpu*/core_ctl/
+	do
+	ctl ${corectl}busy_down_thres "0 0 0 0"
+	ctl ${corectl}busy_up_thres "0 0 0 0"
+	ctl ${corectl}min_cpus 1
+	ctl ${corectl}task_thres 4294967295
+	done
+	
+kmsg "-------------------------------------------------------------------------------------------------------------
+        CPU OPTIMIZED
+-------------------------------------------------------------------------------------------------------------------"
+	
+	for queue in /sys/block/*/queue/
+	do
+	ctl "${queue}iostats" 0
+	ctl "${queue}add_random" 0
+	done
+	
+	# STUNE
+	ctl $ST_FORE/schedtune.sched_boost_no_override 0
+	ctl $ST_TOP/schedtune.sched_boost_no_override 0
+	
+kmsg "-------------------------------------------------------------------------------------------------------------
+         I/O OPTIMIZATIONS APPLIED
+-------------------------------------------------------------------------------------------------------------------"
+
+# Reserve 90% IO bandwith for foreground tasks
+ctl /dev/blkio/blkio.weight 1000
+ctl /dev/blkio/blkio.leaf_weight 1000
+ctl /dev/blkio/background/blkio.weight 100
+ctl /dev/blkio/background/blkio.leaf_weight 100
+ctl $LPM/lpm_prediction N
+ctl $LPM/sleep_disabled N
+
+
+kmsg "-------------------------------------------------------------------------------------------------------------
+         CPU OPTIMIZED
+-------------------------------------------------------------------------------------------------------------------"
+
+ctl "/sys/module/earlysuspend/parameters/debug_mask" 0
+ctl "/sys/module/alarm/parameters/debug_mask" 0
+ctl "/sys/module/alarm_dev/parameters/debug_mask" 0
+ctl "/sys/module/binder/parameters/debug_mask" 0
+ctl "/sys/devices/system/edac/cpu/log_ce" 0
+ctl "/sys/devices/system/edac/cpu/log_ue" 0
+ctl "/sys/module/binder/parameters/debug_mask" 0
+ctl "/sys/module/bluetooth/parameters/disable_ertm" "Y"
+ctl "/sys/module/bluetooth/parameters/disable_esco" "Y"
+ctl "/sys/module/debug/parameters/enable_event_log" 0
+ctl "/sys/module/dwc3/parameters/ep_addr_rxdbg_mask" 0 
+ctl "/sys/module/dwc3/parameters/ep_addr_txdbg_mask" 0
+ctl "/sys/module/edac_core/parameters/edac_mc_log_ce" 0
+ctl "/sys/module/edac_core/parameters/edac_mc_log_ue" 0
+ctl "/sys/module/glink/parameters/debug_mask" 0
+ctl "/sys/module/hid_apple/parameters/fnmode" 0
+ctl "/sys/module/hid_magicmouse/parameters/emulate_3button" "N"
+ctl "/sys/module/hid_magicmouse/parameters/emulate_scroll_wheel" "N"
+ctl "/sys/module/ip6_tunnel/parameters/log_ecn_error" "N"
+ctl "/sys/module/lowmemorykiller/parameters/debug_level" 0
+ctl "/sys/module/mdss_fb/parameters/backlight_dimmer" "N"
+ctl "/sys/module/msm_show_resume_irq/parameters/debug_mask" 0
+ctl "/sys/module/msm_smd/parameters/debug_mask" 0
+ctl "/sys/module/msm_smem/parameters/debug_mask" 0 
+ctl "/sys/module/otg_wakelock/parameters/enabled" "N" 
+ctl "/sys/module/service_locator/parameters/enable" 0 
+ctl "/sys/module/sit/parameters/log_ecn_error" "N"
+ctl "/sys/module/smem_log/parameters/log_enable" 0
+ctl "/sys/module/smp2p/parameters/debug_mask" 0
+ctl "/sys/module/touch_core_base/parameters/debug_mask" 0
+ctl "/sys/module/usb_bam/parameters/enable_event_log" 0
+ctl "/sys/module/printk/parameters/console_suspend" "Y"
+ctl "/proc/sys/debug/exception-trace" 0
+ctl "/proc/sys/kernel/printk" "0 0 0 0"
+ctl "/proc/sys/kernel/compat-log" "0"
+sysctl -e -w kernel.panic_on_oops=0
+sysctl -e -w kernel.panic=0
+if [ -e /sys/module/logger/parameters/log_mode ]; then
+ ctl /sys/module/logger/parameters/log_mode 2
+fi;
+if [ -e /sys/module/printk/parameters/console_suspend ]; then
+ ctl /sys/module/printk/parameters/console_suspend 'Y'
+fi;
+for i in $(find /sys/ -name debug_mask); do
+ ctl $i 0;
+done
+for i in $(find /sys/ -name debug_level); do
+ ctl $i 0;
+done
+for i in $(find /sys/ -name edac_mc_log_ce); do
+ ctl $i 0;
+done
+for i in $(find /sys/ -name edac_mc_log_ue); do
+ ctl $i 0;
+done
+for i in $(find /sys/ -name enable_event_log); do
+ ctl $i 0;
+done
+for i in $(find /sys/ -name log_ecn_error); do
+ ctl $i 0;
+done
+for i in $(find /sys/ -name snapshot_crashdumper); do
+ ctl $i 0;
+done
+kmsg "-------------------------------------------------------------------------------------------------------------
+         DISABLED MISC LOGGING
+-------------------------------------------------------------------------------------------------------------------"
+boot_run_once=false
+lazy_mode=$(getprop persist.lazy.mode)
+
+
+
+(
+while true
+do
+	sleep 15
+	sync
+    mode=$(getprop persist.lazy.mode)
+    if $boot_run_once
+    then
+        [ "$(getprop persist.lazy.mode)" == "$lazy_mode" ] && continue
+    else
+        boot_run_once=true
+    fi
+    lazy_mode=$(getprop persist.lazy.mode)
+    case "$lazy_mode" in
+    # SWITCH BRANCH
+        "1") {
+kmsg "-------------------------------------------------------------------------------------------------------------
+        $(date): AUTOMATIC MODE STARTING
+-------------------------------------------------------------------------------------------------------------------"
+sync
+auto
+ctl $VM/drop_caches 3
+kmsg "-------------------------------------------------------------------------------------------------------------
+       $(date): AUTO MODE ACTIVE
+-------------------------------------------------------------------------------------------------------------------"
+cmode="AUTOMATIC MODE ACTIVE"
+toast
+	};;
+       # Lazy Profile
+        "3") {
+killall auto
+stop auto
+bal
+ctl $VM/drop_caches 3
+cmode="BALANCED MODE ACTIVATED"
+toast
+	};;
+# Performance Profile
+        "4") {
+killall auto
+stop auto
+lat
+ctl $VM/drop_caches 3
+cmode="LATENCY MODE ACTIVATED"
+toast
+	};;
+	# Battery Profile
+        "2") {
+killall auto
+stop auto
+cons
+ctl $VM/drop_caches 3
+cmode="CONSERVATIVE MODE ACTIVATED"
+toast
+	};;
+# Gaming Profile
+        "5") {
+killall auto
+stop auto
+through
+ctl $VM/drop_caches 3
+cmode="THROUGHPUT MODE ACTIVATED"
+toast
+};;
+esac
+done
+) &

@@ -1,0 +1,161 @@
+
+SLOG=/sdcard/Android/swift.log
+APPLIST=/sdcard/Android/applist.txt
+# Log in white and continue (unnecessary)
+kmsg() {
+	echo -e "[-]$@" >> $SLOG
+	echo -e "[-]$@"
+}
+# $1:content
+write_panel()
+{
+    echo "$1" >> "$SLOG"
+}
+save_panel()
+{
+	rm $LOG
+    write_panel "[x]xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+          SWIFT "
+    write_panel "[x]xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+         AUTHOR: LALICE"
+    write_panel "[x]xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+         VERSION: Pandora-Addon"
+    write_panel "[x]xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+         Last performed: $(date '+%Y-%m-%d %H:%M:%S')"
+}
+
+# if applist is empty/missing
+if [ ! -e $APPLIST ]; then
+ echo "com.garena.game.codm" > $APPLIST
+fi
+# save mode for automatic applying mode after reboot
+save_panel
+# Cgroup functions
+# $1:task_name $2:cgroup_name $3:"cpuset"/"stune"
+change_task_cgroup()
+{
+# avoid matching grep itself
+# ps -Ao pid,args | grep kswapd
+# 150 [kswapd0]
+# 16490 grep kswapd
+echo $@
+local ps_ret
+ps_ret="$(ps -Ao pid,args)"
+for temp_pid in $(echo "$ps_ret" | grep "$1" | awk '{print $1}'); do
+for temp_tid in $(ls "/proc/$temp_pid/task/"); do
+echo "$temp_tid" > "/dev/$3/$2/tasks"
+echo "-1000" > "/proc/$temp_tid/oom_score_adj"
+done
+done
+}
+
+# $1:task_name $2:nice(relative to 120)
+change_task_nice()
+{
+# avoid matching grep itself
+# ps -Ao pid,args | grep kswapd
+# 150 [kswapd0]
+# 16490 grep kswapd
+local ps_ret
+ps_ret="$(ps -Ao pid,args)"
+for temp_pid in $(echo "$ps_ret" | grep "$1" | awk '{print $1}'); do
+for temp_tid in $(ls "/proc/$temp_pid/task/"); do
+renice -n "$2" "$temp_tid"
+done
+done
+}
+# $1:task_name $2:nice(relative to 120)
+change_task_ionice()
+{
+# avoid matching grep itself
+# ps -Ao pid,args | grep kswapd
+# 150 [kswapd0]
+# 16490 grep kswapd
+local ps_ret
+ps_ret="$(ps -Ao pid,args)"
+for temp_pid in $(echo "$ps_ret" | grep "$1" | awk '{print $1}'); do
+for temp_tid in $(ls "/proc/$temp_pid/task/"); do
+ionice -c 2 -n "$2" "$temp_tid"
+done
+done
+}
+
+# $1:task_name $2:hex_mask(0x00000003 is CPU0 and CPU1)
+change_task_affinity()
+{
+# avoid matching grep itself
+# ps -Ao pid,args | grep kswapd
+# 150 [kswapd0]
+# 16490 grep kswapd
+local ps_ret
+ps_ret="$(ps -Ao pid,args)"
+for temp_pid in $(echo "$ps_ret" | grep "$1" | awk '{print $1}'); do
+for temp_tid in $(ls "/proc/$temp_pid/task/"); do
+taskset -p "$2" "$temp_tid"
+done
+done
+}
+
+# $1:task_name $2:thread_name $3:cgroup_name $4:"cpuset"/"stune"
+change_thread_cgroup()
+{
+    # avoid matching grep itself
+    # ps -Ao pid,args | grep kswapd
+    # 150 [kswapd0]
+    # 16490 grep kswapd
+    local ps_ret
+    ps_ret="$(ps -Ao pid,args)"
+    for temp_pid in $(echo "$ps_ret" | grep "$1" | awk '{print $1}'); do
+        for temp_tid in $(ls "/proc/$temp_pid/task/"); do
+            if [ "$(grep "$2" /proc/$temp_pid/task/$temp_tid/comm)" != "" ]; then
+                echo "$temp_tid" > "/dev/$4/$3/tasks"
+            fi
+        done
+    done
+}
+
+
+# reduce render thread waiting time
+change_task_cgroup "surfaceflinger" "top-app" "cpuset"
+change_task_cgroup "surfaceflinger" "top-app" "stune"
+change_task_cgroup "system_server" "top-app" "cpuset"
+change_task_cgroup "system_server" "foreground" "stune"
+change_task_cgroup "servicemanager" "top-app" "cpuset"
+change_task_cgroup "servicemanager" "foreground" "stune"
+change_task_cgroup "kswapd0" "background" "cpuset"
+change_task_cgroup "oom_reaper" "background" "cpuset"
+change_task_cgroup "lmkd" "background" "cpuset"
+kmsg "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+         SYSTEM RUNTIME OPTIMIZED"
+# kernel reclaim threads run on more power-efficient cores
+change_task_nice "oom_reaper" "-2"
+change_task_affinity "kswapd0" "7f"
+change_task_affinity "oom_reaper" "7f"
+
+kmsg "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+         CORE DAEMONS PRIORITIZED"
+# changing priority of system services for less aggressive google services and better services management
+change_task_nice "system_server" "-6"
+change_task_nice "launcher" "-6"
+change_task_nice "deletescape" "-6"
+change_task_nice "trebuchet" "-6"
+change_task_nice "fluid" "-9"
+change_task_nice "composer" "-20"
+change_task_nice "kswapd0" "1"
+change_task_nice "surfaceflinger" "-20"
+change_task_nice "servicemanager" "-6"
+change_task_nice "msm_irqbalance" "-5"
+
+kmsg "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+        SYSTEM PRIORITIES OPTIMIZED"
+xargs -rn 1 sh -c "$(typeset -p|grep -vE '(-r)|(-A)'; typeset -f);"' 
+change_task_cgroup "$@" "top-app" "cpuset"; 
+change_task_cgroup "$@" "top-app" "stune"; 
+kmsg "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+         OPTIMIZING $@"' _ < $APPLIST
+                      
+kmsg "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+         DEVICE IS NOW OPTIMIZED
+         xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+         
+         

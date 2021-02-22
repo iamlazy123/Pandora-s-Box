@@ -1,0 +1,4 @@
+-added pixutil support
+-improved cpu rate_limits tuning
+-remove unnecessary tweaks
+-more powersave/performance efficiency

@@ -1,0 +1,166 @@
+
+#------------------------------------===#
+#VARIABLES------------------------------=#
+LOG=/sdcard/Android/lazy.log
+LPM="/sys/module/lpm_levels/parameters"
+LMK="/sys/module/lowmemorykiller/parameters"
+ST_TOP="/dev/stune/top-app"
+ST_FORE="/dev/stune/foreground"
+ST_BACK="/dev/stune/background"
+ST_RT="/dev/stune/rt"
+ST_GLOBAL="/dev/stune/"
+CSET="/dev/cpuset"
+VM="/proc/sys/vm"
+FS="/proc/sys/fs"
+NET="/proc/sys/net"
+KERNEL="/proc/sys/kernel"
+DBG="/sys/kernel/debug"
+#------------------------------------===#
+#------------------------------------===#
+
+# Log in white and continue (unnecessary)
+kmsg() {
+	echo -e "[-] $@" >> $LOG
+	echo -e "[-] $@"
+}
+
+ctl() {
+	# Bail out if file does not exist
+	[[ ! -f "$1" ]] && return 1
+
+	# Fetch the current key value
+	local curval=`cat "$1" 2> /dev/null`
+	
+	# Bail out if value is already set
+	[[ "$curval" == "$2" ]] && return 1
+	
+	# Make file writable in case it is not already
+	chmod 777 "$1" 2> /dev/null
+
+	# Write the new value and bail if there's an error
+	if ! echo "$2" > "$1" 2> /dev/null
+	then
+		return 1
+	fi
+
+	# Log the success
+	kmsg "$1 $curval -> $2"
+}
+kmsg "-------------------------------------------------------------------------------------------------------------
+         BALANCE MODE IS STARTING --
+-------------------------------------------------------------------------------------------------------------------"
+
+# Kernel
+if [ -d $KERNEL ]; then
+ctl $KERNEL/perf_cpu_time_max_percent 15
+ctl $KERNEL/sched_min_task_util_for_boost_colocation 15
+ctl $KERNEL/sched_autogroup_enabled 1
+ctl $KERNEL/sched_child_runs_first 0
+ctl $KERNEL/sched_latency_ns 4000000
+ctl $KERNEL/sched_min_granularity_ns 400000
+ctl $KERNEL/sched_wakeup_granularity_ns 2000000
+ctl $KERNEL/sched_rt_runtime_us 955000
+ctl $KERNEL/sched_initial_task_util 15
+fi
+	for queue in /sys/block/*/queue/
+	do
+	# hybrid schedulers priority
+	avail_scheds=`cat "${queue}scheduler"`
+	for sched in bfq-sq anxiety tripndroid maple zen fiops cfq bfq-mq mq-deadline
+	do
+		if [[ "$avail_scheds" == *"$sched"* ]]
+		then
+			ctl "${queue}scheduler" "$sched"
+			break
+		fi
+	done
+	ctl "${queue}iosched/back_seek_penalty" 1
+	ctl "${queue}iosched/slice_idle" 0
+	ctl "${queue}iosched/fifo_expire_sync" 300
+	ctl "${queue}iosched/fifo_expire_async" 150
+	ctl "${queue}iosched/slice_sync" 120
+	ctl "${queue}iosched/slice_async" 48
+	ctl "${queue}iosched/low_latency" 0
+	ctl "${queue}iosched/group_idle" 0
+	ctl "${queue}iosched/back_seek_penalty" 1
+	ctl "${queue}iosched/quantum" 16
+	ctl "${queue}iosched/slice_async_rq" 2
+	ctl "${queue}iosched/back_seek_max" 214748364
+	ctl "${queue}nr_requests" 128
+	ctl "${queue}read_ahead_kb" 128
+	done
+	
+	for _ in $(seq 2)
+	do
+	# Migrate tasks down at this much load
+	ctl $KERNEL/sched_downmigrate 65
+	ctl $KERNEL/sched_group_downmigrate 65
+	
+	# Migrate tasks up at this much load
+	ctl $KERNEL/sched_upmigrate 85
+	ctl $KERNEL/sched_group_upmigrate 85
+	done
+	
+#GPU Tunables     	
+ctl /sys/class/kgsl/kgsl-3d0/idle_timer 64
+ctl /sys/class/kgsl/kgsl-3d0/force_clk_on 0
+ctl /sys/class/kgsl/kgsl-3d0/force_bus_on 0
+ctl /sys/class/kgsl/kgsl-3d0/force_no_nap 0
+ctl /sys/class/kgsl/kgsl-3d0/devfreq/adrenoboost 1
+ctl /sys/class/kgsl/kgsl-3d0/force_rail_on 0
+ctl /sys/class/kgsl/kgsl-3d0/bus_split 1
+ctl /sys/class/kgsl/kgsl-3d0/throttling 1
+
+if [ -e "/sys/module/adreno_idler" ]; then
+	ctl /sys/module/adreno_idler/parameters/adreno_idler_active "Y"
+	ctl /sys/module/adreno_idler/parameters/adreno_idler_idleworkload "7000"
+	ctl /sys/module/adreno_idler/parameters/adreno_idler_downdifferential '15'
+	ctl /sys/module/adreno_idler/parameters/adreno_idler_idlewait '15'
+fi
+	
+# Loop over each CPU in the system
+for cpu in /sys/devices/system/cpu/cpu*/cpufreq
+do
+	# Fetch the available governors from the CPU
+	avail_govs="$(cat "$cpu/scaling_available_governors")"
+
+	# Attempt to set the governor in this order
+	for governor in juggernaut alucardsched pixutil schedutil_pixel blu_schedutil schedutil interactive
+	do
+		# Once a matching governor is found, set it and break for this CPU
+		if [[ "$avail_govs" == *"$governor"* ]]
+		then
+			ctl "$cpu/scaling_governor" "$governor"
+			break
+		fi
+	done
+		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/up_rate_limit_us 20000
+		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/down_rate_limit_us 20000
+		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/up_rate_limit_us 10000
+		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/down_rate_limit_us 20000
+		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/up_rate_limit_us 10000
+		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/down_rate_limit_us 20000
+		ctl "${CPU}schedutil/rate_limit_us" 20000
+		ctl "${CPU}schedutil/hispeed_load" 90
+		ctl "${CPU}schedutil/hispeed_freq" 0
+		ctl "${CPU}schedutil/pl" 1
+		ctl "${CPU}schedutil/iowait_boost_enable" 1
+done
+	
+	ctl $VM/vfs_cache_pressure 500
+	ctl $VM/dirty_background_ratio 10
+	ctl $VM/dirty_ratio 50
+	ctl $VM/dirty_expire_centisecs 6000
+	ctl $VM/dirty_writeback_centisecs 3000
+	ctl $VM/swappiness 100
+	
+	#TOP-APP
+	ctl $ST_TOP/schedtune.boost 0
+	ctl $ST_TOP/schedtune.prefer_idle 0
+	
+	kmsg "-------------------------------------------------------------------------------------------------------------
+        $(date): BALANCE MODE ACTIVATED --
+-------------------------------------------------------------------------------------------------------------------"
+	# Sucess Message
+	kmsg "LAZY HAS EXECUTED TASK SUCCESSFULLY. ENJOY!"
+	

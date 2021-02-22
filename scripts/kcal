@@ -1,0 +1,8 @@
+
+# sRGB Enable 
+echo "1"  > /sys/module/mdss_fb/parameters/srgb_enabled
+echo "2" > /sys/class/graphics/fb0/msm_fb_srgb
+
+# Adjust tune color
+
+
