@@ -174,10 +174,10 @@ ctl /proc/sys/net/core/netdev_tstamp_prequeue 0
 ctl /sys/module/msm_performance/parameters/touchboost 1
 #based on mvk's principle for cpu_input boosting
 ctl /sys/module/cpu_input_boost/parameters/input_boost_freq_hp 1400000
-ctl /sys/module/cpu_input_boost/parameters/input_boost_duration 58
-ctl /sys/module/cpu_input_boost/parameters/input_boost_freq_lp 0
+ctl /sys/module/cpu_input_boost/parameters/input_boost_duration 50
+ctl /sys/module/cpu_input_boost/parameters/input_boost_freq_lp 1400000
 ctl /sys/module/cpu_boost/parameters/input_boost_freq "0:1400000 1:0 2:0 3:0 4:0 5:0 6:0 7:0"
-ctl /sys/module/cpu_boost/parameters/input_boost_ms 58
+ctl /sys/module/cpu_boost/parameters/input_boost_ms 50
 ctl /sys/kernel/fast_charge/force_fast_charge 1
 
 	#based from zenith kernel's core control
