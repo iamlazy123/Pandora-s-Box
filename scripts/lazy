@@ -197,6 +197,8 @@ kmsg "--------------------------------------------------------------------------
 	do
 	ctl "${queue}iostats" 0
 	ctl "${queue}add_random" 0
+	ctl "${queue}rq_affinity" 2
+	ctl "${queue}nomerges" 0
 	done
 	
 	# STUNE
