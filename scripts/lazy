@@ -103,7 +103,7 @@ ctl $VM/overcommit_memory 1
 ctl $VM/overcommit_ratio 100
 ctl $VM/reap_mem_on_sigkill 1
 ctl $VM/oom_dump_tasks 0
-ctl $VM/stat_interval 20
+ctl $VM/stat_interval 120
 ctl $VM/extfrag_threshold 750
 ctl $VM/compact_memory 1
 ctl $VM/page-cluster 0
