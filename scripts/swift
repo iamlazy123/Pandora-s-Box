@@ -9,7 +9,7 @@ kmsg() {
 # $1:content
 write_panel()
 {
-    echo "$1" >> "$LOG"
+    echo "$1" >> "$SLOG"
 }
 save_panel()
 {
