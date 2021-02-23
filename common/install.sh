@@ -217,7 +217,7 @@ esac
 
 case $swift in
 	1 ) l2=$(cat $MODPATH/scripts/swift); echo "$l2" >> /data/adb/modules_update/toolbox8/system/bin/pandora;;
-	2 ) rm -rf /data/adb/modules_update/toolbox8/scripts/swift;;
+	2 ) rm -rf /data/adb/modules_update/toolbox8/scripts/swift; rm -rf /data/adb/modules_update/toolbox8/system/bin/adjshield; rm -rf /data/adb/modules_update/toolbox8/system/bin/fscache-ctrl;;
 esac
 
 case $def in
