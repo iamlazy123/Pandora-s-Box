@@ -282,15 +282,13 @@ done
 (
 while true; do
   if [ $(top -n 1 -d 1 | head -n 12 | grep -o -e 'netease' -e 'ubisoft' -e 'tencent' -e 'mobile' -e 'gameloft' -e 'garena' -e 'moontoon' -e 'legends' -e 'wildrift' -e 'activision' -e 'battle' -e 'freefireth' -e 'com.miHoYo.GenshinImpact' -e 'genshin' -e 'hokai' -e 'dragon' -e 'konami' -e 'namco' -e 'gamevil' -e 'battle' -e 'impact' -e 'race' -e 'gameloft' -e 'asphalt' -e 'shadow' -e 'valor' | head -n 1) ]; then
-game=1
-if [ $game -eq 1 ]; then
 throughput_start
-echo "Game detected. activating throughput mode." >> $LOG
+echo "Game detected. activating throughput mode."
+sleep 60
 else
-game=2
 latency_start
-echo "No heavy apps detected, activating latency mode." >> $LOG
- fi
+echo "No heavy apps detected, activating latency mode."
+sleep 60
  fi
 done
 )&
