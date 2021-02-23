@@ -76,15 +76,15 @@ fi
 	done
 	ctl "${queue}iosched/back_seek_penalty" 1
 	ctl "${queue}iosched/slice_idle" 0
-	ctl "${queue}iosched/fifo_expire_sync" 250
-	ctl "${queue}iosched/fifo_expire_async" 125
-	ctl "${queue}iosched/slice_sync" 100
-	ctl "${queue}iosched/slice_async" 10
+	ctl "${queue}iosched/fifo_expire_sync" 330
+	ctl "${queue}iosched/fifo_expire_async" 80
+	ctl "${queue}iosched/slice_sync" 250
+	ctl "${queue}iosched/slice_async" 25
 	ctl "${queue}iosched/low_latency" 1
 	ctl "${queue}iosched/group_idle" 0
 	ctl "${queue}iosched/back_seek_penalty" 1
-	ctl "${queue}iosched/quantum" 16
-	ctl "${queue}iosched/slice_async_rq" 2
+	ctl "${queue}iosched/quantum" 8
+	ctl "${queue}iosched/slice_async_rq" 1
 	ctl "${queue}iosched/back_seek_max" 2147483647
 	ctl "${queue}nr_requests" 32
 	ctl "${queue}read_ahead_kb" 128
@@ -125,7 +125,7 @@ do
 	avail_govs="$(cat "$cpu/scaling_available_governors")"
 
 	# Attempt to set the governor in this order
-	for governor in performance schedutil_pixel blu_schedutil schedutil
+	for governor in pixutil schedutil_pixel blu_schedutil schedutil
 	do
 		# Once a matching governor is found, set it and break for this CPU
 		if [[ "$avail_govs" == *"$governor"* ]]
@@ -134,9 +134,13 @@ do
 			break
 		fi
 	done
-		ctl "${CPU}schedutil/up_rate_limit_us" 500
-		ctl "${CPU}schedutil/down_rate_limit_us" 20000
-		ctl "${CPU}schedutil/rate_limit_us" 500
+		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/up_rate_limit_us 20000
+		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/down_rate_limit_us 20000
+		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/up_rate_limit_us 10000
+		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/down_rate_limit_us 20000
+		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/up_rate_limit_us 10000
+		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/down_rate_limit_us 20000
+		ctl "${CPU}schedutil/rate_limit_us" 10000
 		ctl "${CPU}schedutil/hispeed_load" 90
 		ctl "${CPU}schedutil/hispeed_freq" 0
 		ctl "${CPU}schedutil/pl" 1
@@ -151,7 +155,7 @@ done
 	ctl $VM/swappiness 100
 	
 	#TOP-APP
-	ctl $ST_TOP/schedtune.boost 20
+	ctl $ST_TOP/schedtune.boost 25
 	ctl $ST_TOP/schedtune.prefer_idle 0
 	
 	kmsg "-------------------------------------------------------------------------------------------------------------
