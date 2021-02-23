@@ -9,27 +9,91 @@ kmsg() {
 # $1:content
 write_panel()
 {
-    echo "$1" >> "$SLOG"
+    echo "$1" >> "$LOG"
 }
 save_panel()
 {
-	rm $LOG
-    write_panel "[x]xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-          SWIFT "
-    write_panel "[x]xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    write_panel "[-]======================================================================
+          SWIFT"
+    write_panel "[-]======================================================================
          AUTHOR: LALICE"
-    write_panel "[x]xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-         VERSION: Pandora-Addon"
-    write_panel "[x]xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    write_panel "[-]======================================================================
+         VERSION: Pandora"
+    write_panel "[-]======================================================================
          Last performed: $(date '+%Y-%m-%d %H:%M:%S')"
+    write_panel "[-]======================================================================
+         FSCACHE STATUS: $(fscc_status)"
+    write_panel "[-]======================================================================
+         ADJSHIELD STATUS: $(adjshield_status)"
+    write_panel "[-]======================================================================
+         AdjShield config file path: adjshield_cfg=$adjshield_cfg"
 }
-
 # if applist is empty/missing
 if [ ! -e $APPLIST ]; then
  echo "com.garena.game.codm" > $APPLIST
 fi
-# save mode for automatic applying mode after reboot
-save_panel
+###############################
+# PATHs
+###############################
+
+ADJSHIELD_REL="$BIN_DIR"
+ADJSHIELD_NAME="adjshield"
+
+###############################
+# AdjShield tool functions
+###############################
+
+adjshield_cfg="/sdcard/Android/panel_adjshield.txt"
+adjshield_log="/sdcard/Android/log_adjshield.txt"
+
+# $1:str
+adjshield_write_cfg()
+{
+    echo "$1" >> "$adjshield_cfg"
+}
+
+adjshield_create_default_cfg()
+{
+    true > "$adjshield_cfg"
+    adjshield_write_cfg "# AdjShield Config File"
+    adjshield_write_cfg "# Prevent given processes from being killed by Android LMK by protecting oom_score_adj"
+    adjshield_write_cfg "# List all the package names of your Apps which you want to keep alive."
+    adjshield_write_cfg "com.riotgames.league.wildrift"
+    adjshield_write_cfg "com.garena.game.codm"
+    adjshield_write_cfg "com.mobile.legends"
+    adjshield_write_cfg "com.tencent.ig"
+}
+
+adjshield_start()
+{
+    # clear log file
+    true > "$adjshield_log"
+    # check interval: 120 seconds - Deprecated, use event driven instead
+    "$MODPATH/system/bin/adjshield" -o "$adjshield_log" -c "$adjshield_cfg" &
+}
+
+adjshield_stop()
+{
+    killall "$ADJSHIELD_NAME"
+}
+
+# return:status
+adjshield_status()
+{
+    local err
+    if [ "$(ps -A | grep "$ADJSHIELD_NAME")" != "" ]; then
+        echo "Running. See $adjshield_log for details."
+    else
+        # "Error: Log file not found"
+        err="$(cat "$adjshield_log" | grep Error | head -n 1 | cut -d: -f2)"
+        if [ "$err" != "" ]; then
+            echo "Not running.$err."
+        else
+            echo "Not running. Unknown reason."
+        fi
+    fi
+}
+
 # Cgroup functions
 # $1:task_name $2:cgroup_name $3:"cpuset"/"stune"
 change_task_cgroup()
@@ -38,7 +102,6 @@ change_task_cgroup()
 # ps -Ao pid,args | grep kswapd
 # 150 [kswapd0]
 # 16490 grep kswapd
-echo $@
 local ps_ret
 ps_ret="$(ps -Ao pid,args)"
 for temp_pid in $(echo "$ps_ret" | grep "$1" | awk '{print $1}'); do
@@ -60,7 +123,7 @@ local ps_ret
 ps_ret="$(ps -Ao pid,args)"
 for temp_pid in $(echo "$ps_ret" | grep "$1" | awk '{print $1}'); do
 for temp_tid in $(ls "/proc/$temp_pid/task/"); do
-renice -n "$2" "$temp_tid"
+renice -n "$2" -p "$temp_tid"
 done
 done
 }
@@ -75,7 +138,7 @@ local ps_ret
 ps_ret="$(ps -Ao pid,args)"
 for temp_pid in $(echo "$ps_ret" | grep "$1" | awk '{print $1}'); do
 for temp_tid in $(ls "/proc/$temp_pid/task/"); do
-ionice -c 2 -n "$2" "$temp_tid"
+ionice -c 2 -n "$2" -p "$temp_tid"
 done
 done
 }
@@ -95,67 +158,244 @@ taskset -p "$2" "$temp_tid"
 done
 done
 }
-
-# $1:task_name $2:thread_name $3:cgroup_name $4:"cpuset"/"stune"
-change_thread_cgroup()
-{
-    # avoid matching grep itself
-    # ps -Ao pid,args | grep kswapd
-    # 150 [kswapd0]
-    # 16490 grep kswapd
-    local ps_ret
-    ps_ret="$(ps -Ao pid,args)"
-    for temp_pid in $(echo "$ps_ret" | grep "$1" | awk '{print $1}'); do
-        for temp_tid in $(ls "/proc/$temp_pid/task/"); do
-            if [ "$(grep "$2" /proc/$temp_pid/task/$temp_tid/comm)" != "" ]; then
-                echo "$temp_tid" > "/dev/$4/$3/tasks"
-            fi
-        done
-    done
-}
-
+rm $LOG
+# fix laggy bilibili feed scrolling
+change_task_cgroup "servicemanager" "top-app" "cpuset"
+change_task_cgroup "servicemanager" "foreground" "stune"
+change_task_cgroup "android.phone" "top-app" "cpuset"
+change_task_cgroup "android.phone" "foreground" "stune"
+change_task_cgroup "crtc_commit" "background" "cpuset"
+change_task_cgroup "crtc_commit" "background" "stune"
+# fix laggy home gesture
+change_task_cgroup "system_server" "top-app" "cpuset"
+change_task_cgroup "system_server" "foreground" "stune"
+change_task_cgroup "google" "background" "cpuset"
+change_task_cgroup "com.android.vending" "background" "cpuset"
+change_task_cgroup "com.android.gms" "background" "cpuset"
+kmsg "=======================================================================
+         UX OPTIMIZED"
 
 # reduce render thread waiting time
 change_task_cgroup "surfaceflinger" "top-app" "cpuset"
-change_task_cgroup "surfaceflinger" "top-app" "stune"
-change_task_cgroup "system_server" "top-app" "cpuset"
-change_task_cgroup "system_server" "foreground" "stune"
-change_task_cgroup "servicemanager" "top-app" "cpuset"
-change_task_cgroup "servicemanager" "foreground" "stune"
-change_task_cgroup "kswapd0" "background" "cpuset"
-change_task_cgroup "oom_reaper" "background" "cpuset"
-change_task_cgroup "lmkd" "background" "cpuset"
-kmsg "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-         SYSTEM RUNTIME OPTIMIZED"
+change_task_cgroup "surfaceflinger" "foreground" "stune"
+change_task_cgroup "hardware" "top-app" "cpuset"
+change_task_cgroup "hardware" "foreground" "stune"
+change_task_affinity "hardware" "ff"
+change_task_affinity "ksoftirqd" "ff"
+change_task_affinity "kworker" "ff"
+change_task_affinity "com.android.gms" "01"
+change_task_affinity "com.android.vending" "01"
+kmsg "=======================================================================
+         TASK OPTIMIZED"
+
 # kernel reclaim threads run on more power-efficient cores
-change_task_nice "oom_reaper" "-2"
+change_task_nice "kswapd0" "-6"
+change_task_nice "oom_reaper" "-6"
 change_task_affinity "kswapd0" "7f"
 change_task_affinity "oom_reaper" "7f"
-
-kmsg "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-         CORE DAEMONS PRIORITIZED"
+change_task_cgroup "kswapd" "foreground" "cpuset"
+change_task_cgroup "oom_reaper" "foreground" "cpuset"
+change_task_affinity "surfaceflinger" "ff"
+change_task_ionice "surfaceflinger" "7"
+change_task_ionice "composer" "7"
+change_task_ionice "hardware" "7"
+kmsg "=======================================================================
+         RENDERING UNLOCKED"
 # changing priority of system services for less aggressive google services and better services management
-change_task_nice "system_server" "-6"
+change_task_nice "system_server" "-9"
 change_task_nice "launcher" "-6"
-change_task_nice "deletescape" "-6"
 change_task_nice "trebuchet" "-6"
+change_task_nice "inputmethod" "-3"
 change_task_nice "fluid" "-9"
 change_task_nice "composer" "-20"
-change_task_nice "kswapd0" "1"
+change_task_nice "com.android.phone" "-3"
 change_task_nice "surfaceflinger" "-20"
-change_task_nice "servicemanager" "-6"
-change_task_nice "msm_irqbalance" "-5"
-
-kmsg "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-        SYSTEM PRIORITIES OPTIMIZED"
+change_task_nice "servicemanager" "-20"
+change_task_nice "hardware" "-20"
+change_task_nice "dsi_err_workq" "-10"
+change_task_nice "com.android.gms" "2"
+change_task_nice "com.android.vending" "2"
+kmsg "=======================================================================
+         CGROUPS OPTIMIZED"
 xargs -rn 1 sh -c "$(typeset -p|grep -vE '(-r)|(-A)'; typeset -f);"' 
 change_task_cgroup "$@" "top-app" "cpuset"; 
 change_task_cgroup "$@" "top-app" "stune"; 
 kmsg "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
          OPTIMIZING $@"' _ < $APPLIST
-                      
-kmsg "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-         DEVICE IS NOW OPTIMIZED
-         xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-         
-         
+###############################
+# PATHs
+###############################
+
+FSCC_NAME="fscache-ctrl"
+
+###############################
+# Abbreviations
+###############################
+
+SYS_FRAME="/system/framework"
+SYS_LIB="/system/lib64"
+VDR_LIB="/vendor/lib64"
+DALVIK="/data/dalvik-cache"
+APEX1="/apex/com.android.art/javalib"
+APEX2="/apex/com.android.runtime/javalib"
+
+###############################
+# FSCC tool functions
+###############################
+
+fscc_file_list=""
+
+# $1:apk_path $return:oat_path
+fscc_path_apk_to_oat()
+{
+    # OPSystemUI/OPSystemUI.apk -> OPSystemUI/oat
+    echo "${1%/*}/oat"
+}
+
+# $1:file/dir
+fscc_list_append()
+{
+    fscc_file_list="$fscc_file_list $1"
+}
+
+# $1:file/dir
+fscc_add_obj()
+{
+    # whether file or dir exists
+    if [ -e "$1" ]; then
+        fscc_list_append "$1"
+    fi
+}
+
+# $1:package_name
+fscc_add_apk()
+{
+    if [ "$1" != "" ]; then
+        # pm path -> "package:/system/product/priv-app/OPSystemUI/OPSystemUI.apk"
+        fscc_add_obj "$(pm path "$1" | head -n 1 | cut -d: -f2)"
+    fi
+}
+
+# $1:package_name
+fscc_add_dex()
+{
+    local package_apk_path
+    local apk_name
+
+    if [ "$1" != "" ]; then
+        # pm path -> "package:/system/product/priv-app/OPSystemUI/OPSystemUI.apk"
+        package_apk_path="$(pm path "$1" | head -n 1 | cut -d: -f2)"
+        # user app: OPSystemUI/OPSystemUI.apk -> OPSystemUI/oat
+        fscc_add_obj "${package_apk_path%/*}/oat"
+
+        # remove apk name suffix
+        apk_name="${package_apk_path%/*}"
+        # remove path prefix
+        apk_name="${apk_name##*/}"
+        # system app: get dex & vdex
+        # /data/dalvik-cache/arm64/system@product@priv-app@OPSystemUI@OPSystemUI.apk@classes.dex
+        for dex in $(find "$DALVIK" | grep "@$apk_name@"); do
+            fscc_add_obj "$dex"
+        done
+   fi
+}
+
+fscc_add_app_home()
+{
+    # well, not working on Android 7.1
+    local intent_act="android.intent.action.MAIN"
+    local intent_cat="android.intent.category.HOME"
+    local pkg_name
+    # "  packageName=com.microsoft.launcher"
+    pkg_name="$(pm resolve-activity -a "$intent_act" -c "$intent_cat" | grep packageName | head -n 1 | cut -d= -f2)"
+    # /data/dalvik-cache/arm64/system@priv-app@OPLauncher2@OPLauncher2.apk@classes.dex 16M/31M  53.2%
+    # /data/dalvik-cache/arm64/system@priv-app@OPLauncher2@OPLauncher2.apk@classes.vdex 120K/120K  100%
+    # /system/priv-app/OPLauncher2/OPLauncher2.apk 14M/30M  46.1%
+    fscc_add_apk "$pkg_name"
+    fscc_add_dex "$pkg_name"
+}
+
+fscc_add_app_ime()
+{
+    local pkg_name
+    # "      packageName=com.baidu.input_yijia"
+    pkg_name="$(ime list | grep packageName | head -n 1 | cut -d= -f2)"
+    # /data/dalvik-cache/arm/system@app@baidushurufa@baidushurufa.apk@classes.dex 5M/17M  33.1%
+    # /data/dalvik-cache/arm/system@app@baidushurufa@baidushurufa.apk@classes.vdex 2M/7M  28.1%
+    # /system/app/baidushurufa/baidushurufa.apk 1M/28M  5.71%
+    # pin apk file in memory is not valuable
+    fscc_add_dex "$pkg_name"
+}
+
+# $1:package_name
+fscc_add_apex_lib()
+{
+    fscc_add_obj "$(find /apex -name "$1" | head -n 1)"
+}
+
+# after appending fscc_file_list
+fscc_start()
+{
+    # multiple parameters, cannot be warped by ""
+    "$MODPATH/system/bin/fscache-ctrl" -fdlb0 $fscc_file_list
+}
+
+fscc_stop()
+{
+    killall "$FSCC_NAME"
+}
+
+# return:status
+fscc_status()
+{
+    # get the correct value after waiting for fscc loading files
+    sleep 15
+    if [ "$(ps -A | grep "$FSCC_NAME")" != "" ]; then
+        echo "Running. $(cat /proc/meminfo | grep Mlocked | cut -d: -f2 | tr -d ' ') in cache."
+    else
+        echo "Not running."
+    fi
+}
+# similiar to PinnerService, Mlock(Unevictable) 200~350MB
+fscc_add_obj "$SYS_FRAME/framework.jar"
+fscc_add_obj "$SYS_FRAME/services.jar"
+fscc_add_obj "$SYS_FRAME/ext.jar"
+fscc_add_obj "$SYS_FRAME/telephony-common.jar"
+fscc_add_obj "$SYS_FRAME/qcnvitems.jar"
+fscc_add_obj "$SYS_FRAME/oat"
+fscc_add_obj "$SYS_FRAME/arm64"
+fscc_add_obj "$SYS_FRAME/arm/boot-framework.oat"
+fscc_add_obj "$SYS_FRAME/arm/boot-framework.vdex"
+fscc_add_obj "$SYS_FRAME/arm/boot.oat"
+fscc_add_obj "$SYS_FRAME/arm/boot.vdex"
+fscc_add_obj "$SYS_FRAME/arm/boot-core-libart.oat"
+fscc_add_obj "$SYS_FRAME/arm/boot-core-libart.vdex"
+fscc_add_obj "$SYS_LIB/libandroid_servers.so"
+fscc_add_obj "$SYS_LIB/libandroid_runtime.so"
+fscc_add_obj "$SYS_LIB/libandroidfw.so"
+fscc_add_obj "$SYS_LIB/libandroid.so"
+fscc_add_obj "$SYS_LIB/libhwui.so"
+fscc_add_obj "$SYS_LIB/libjpeg.so"
+fscc_add_obj "$VDR_LIB/libssc.so"
+fscc_add_obj "$VDR_LIB/libgsl.so"
+fscc_add_obj "$VDR_LIB/sensors.ssc.so"
+fscc_add_apex_lib "core-oj.jar"
+fscc_add_apex_lib "core-libart.jar"
+fscc_add_apex_lib "updatable-media.jar"
+fscc_add_apex_lib "okhttp.jar"
+fscc_add_apex_lib "bouncycastle.jar"
+
+fscc_stop
+fscc_start
+fscc_status
+kmsg "=======================================================================
+       FSCACHE OPTIMIZED AND RUNNING"
+# start adjshield
+[ ! -f "$adjshield_cfg" ] && adjshield_create_default_cfg
+adjshield_stop
+adjshield_start
+
+kmsg "=======================================================================
+       RUNTIME TWEAKS APPLIED"
+# save mode for automatic applying mode after reboot
+save_panel
