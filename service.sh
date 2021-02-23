@@ -18,12 +18,12 @@ wait_until_login()
 }
 wait_until_login
 
-echo "Please wait for 15 seconds, Pandora is waiting for your vendor scripts to finish executing." > /sdcard/android/pandora.log
+echo "Please wait for 30 seconds, Pandora is waiting for your vendor scripts to finish executing." > /sdcard/android/pandora.log
 
 rm -rf /sdcard/android/lazy.log
 rm -rf /sdcard/android/swift.log
 
-sleep 60
+sleep 30
 
 rm -rf /sdcard/android/pandora.log
 # Setup tweaks

@@ -221,11 +221,11 @@ case $swift in
 esac
 
 case $def in
-	1 ) sed -i "294i setprop persist.lazy.mode 1" /data/adb/modules_update/toolbox8/scripts/lazy;;
-	2 ) sed -i "294i setprop persist.lazy.mode 2" /data/adb/modules_update/toolbox8/scripts/lazy;;
-	3 ) sed -i "294i setprop persist.lazy.mode 3" /data/adb/modules_update/toolbox8/scripts/lazy;;
-	4 ) sed -i "294i setprop persist.lazy.mode 4" /data/adb/modules_update/toolbox8/scripts/lazy;;
-	5 ) sed -i "294i setprop persist.lazy.mode 5" /data/adb/modules_update/toolbox8/scripts/lazy;;
+	1 ) sed -i "256i setprop persist.lazy.mode 1" /data/adb/modules_update/toolbox8/scripts/lazy;;
+	2 ) sed -i "256i setprop persist.lazy.mode 2" /data/adb/modules_update/toolbox8/scripts/lazy;;
+	3 ) sed -i "256i setprop persist.lazy.mode 3" /data/adb/modules_update/toolbox8/scripts/lazy;;
+	4 ) sed -i "256i setprop persist.lazy.mode 4" /data/adb/modules_update/toolbox8/scripts/lazy;;
+	5 ) sed -i "256i setprop persist.lazy.mode 5" /data/adb/modules_update/toolbox8/scripts/lazy;;
 	6 ) ui_print " Why are you not installing lazy T^T "
 esac
 

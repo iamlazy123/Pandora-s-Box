@@ -175,7 +175,7 @@ ctl /sys/module/msm_performance/parameters/touchboost 1
 #based on mvk's principle for cpu_input boosting
 ctl /sys/module/cpu_input_boost/parameters/input_boost_freq_hp 1400000
 ctl /sys/module/cpu_input_boost/parameters/input_boost_duration 50
-ctl /sys/module/cpu_input_boost/parameters/input_boost_freq_lp 1400000
+ctl /sys/module/cpu_input_boost/parameters/input_boost_freq_lp 0
 ctl /sys/module/cpu_boost/parameters/input_boost_freq "0:1400000 1:0 2:0 3:0 4:0 5:0 6:0 7:0"
 ctl /sys/module/cpu_boost/parameters/input_boost_ms 50
 ctl /sys/kernel/fast_charge/force_fast_charge 1
@@ -197,7 +197,26 @@ kmsg "--------------------------------------------------------------------------
 	do
 	ctl "${queue}iostats" 0
 	ctl "${queue}add_random" 0
+	done
+	
+	for queue in /sys/block/mmc*/queue/
+	do
 	ctl "${queue}rq_affinity" 2
+	ctl "${queue}rotational" 1
+	ctl "${queue}nomerges" 0
+	done
+	
+	for queue in /sys/block/s*/queue/
+	do
+	ctl "${queue}rq_affinity" 2
+	ctl "${queue}rotational" 1
+	ctl "${queue}nomerges" 0
+	done
+	
+	for queue in /sys/block/d*/queue/
+	do
+	ctl "${queue}rq_affinity" 2
+	ctl "${queue}rotational" 1
 	ctl "${queue}nomerges" 0
 	done
 	
@@ -208,63 +227,6 @@ kmsg "--------------------------------------------------------------------------
 kmsg "-------------------------------------------------------------------------------------------------------------
          I/O OPTIMIZATIONS APPLIED
 -------------------------------------------------------------------------------------------------------------------"
-
-# Reserve 90% IO bandwith for foreground tasks
-ctl /dev/blkio/blkio.weight 1000
-ctl /dev/blkio/blkio.leaf_weight 1000
-ctl /dev/blkio/background/blkio.weight 100
-ctl /dev/blkio/background/blkio.leaf_weight 100
-ctl $LPM/lpm_prediction N
-ctl $LPM/sleep_disabled N
-
-
-kmsg "-------------------------------------------------------------------------------------------------------------
-         CPU OPTIMIZED
--------------------------------------------------------------------------------------------------------------------"
-
-ctl "/sys/module/earlysuspend/parameters/debug_mask" 0
-ctl "/sys/module/alarm/parameters/debug_mask" 0
-ctl "/sys/module/alarm_dev/parameters/debug_mask" 0
-ctl "/sys/module/binder/parameters/debug_mask" 0
-ctl "/sys/devices/system/edac/cpu/log_ce" 0
-ctl "/sys/devices/system/edac/cpu/log_ue" 0
-ctl "/sys/module/binder/parameters/debug_mask" 0
-ctl "/sys/module/bluetooth/parameters/disable_ertm" "Y"
-ctl "/sys/module/bluetooth/parameters/disable_esco" "Y"
-ctl "/sys/module/debug/parameters/enable_event_log" 0
-ctl "/sys/module/dwc3/parameters/ep_addr_rxdbg_mask" 0 
-ctl "/sys/module/dwc3/parameters/ep_addr_txdbg_mask" 0
-ctl "/sys/module/edac_core/parameters/edac_mc_log_ce" 0
-ctl "/sys/module/edac_core/parameters/edac_mc_log_ue" 0
-ctl "/sys/module/glink/parameters/debug_mask" 0
-ctl "/sys/module/hid_apple/parameters/fnmode" 0
-ctl "/sys/module/hid_magicmouse/parameters/emulate_3button" "N"
-ctl "/sys/module/hid_magicmouse/parameters/emulate_scroll_wheel" "N"
-ctl "/sys/module/ip6_tunnel/parameters/log_ecn_error" "N"
-ctl "/sys/module/lowmemorykiller/parameters/debug_level" 0
-ctl "/sys/module/mdss_fb/parameters/backlight_dimmer" "N"
-ctl "/sys/module/msm_show_resume_irq/parameters/debug_mask" 0
-ctl "/sys/module/msm_smd/parameters/debug_mask" 0
-ctl "/sys/module/msm_smem/parameters/debug_mask" 0 
-ctl "/sys/module/otg_wakelock/parameters/enabled" "N" 
-ctl "/sys/module/service_locator/parameters/enable" 0 
-ctl "/sys/module/sit/parameters/log_ecn_error" "N"
-ctl "/sys/module/smem_log/parameters/log_enable" 0
-ctl "/sys/module/smp2p/parameters/debug_mask" 0
-ctl "/sys/module/touch_core_base/parameters/debug_mask" 0
-ctl "/sys/module/usb_bam/parameters/enable_event_log" 0
-ctl "/sys/module/printk/parameters/console_suspend" "Y"
-ctl "/proc/sys/debug/exception-trace" 0
-ctl "/proc/sys/kernel/printk" "0 0 0 0"
-ctl "/proc/sys/kernel/compat-log" "0"
-sysctl -e -w kernel.panic_on_oops=0
-sysctl -e -w kernel.panic=0
-if [ -e /sys/module/logger/parameters/log_mode ]; then
- ctl /sys/module/logger/parameters/log_mode 2
-fi;
-if [ -e /sys/module/printk/parameters/console_suspend ]; then
- ctl /sys/module/printk/parameters/console_suspend 'Y'
-fi;
 for i in $(find /sys/ -name debug_mask); do
  ctl $i 0;
 done
@@ -287,7 +249,7 @@ for i in $(find /sys/ -name snapshot_crashdumper); do
  ctl $i 0;
 done
 kmsg "-------------------------------------------------------------------------------------------------------------
-         DISABLED MISC LOGGING
+         DISABLED GPU DEBUGGING
 -------------------------------------------------------------------------------------------------------------------"
 boot_run_once=false
 lazy_mode=$(getprop persist.lazy.mode)

@@ -172,15 +172,15 @@ kmsg "--------------------------------------------------------------------------
 
 # Kernel
 if [ -d $KERNEL ]; then
-ctl $KERNEL/perf_cpu_time_max_percent 15
-ctl $KERNEL/sched_min_task_util_for_boost_colocation 0
+ctl $KERNEL/perf_cpu_time_max_percent 25
+ctl $KERNEL/sched_min_task_util_for_boost_colocation 1000
 ctl $KERNEL/sched_autogroup_enabled 0
 ctl $KERNEL/sched_child_runs_first 0
 ctl $KERNEL/sched_latency_ns 10000000
 ctl $KERNEL/sched_min_granularity_ns 1000000
 ctl $KERNEL/sched_wakeup_granularity_ns 5000000
 ctl $KERNEL/sched_rt_runtime_us -1
-ctl $KERNEL/sched_initial_task_util 0
+ctl $KERNEL/sched_initial_task_util 1000
 fi
 	for queue in /sys/block/*/queue/
 	do
@@ -196,29 +196,29 @@ fi
 	done
 	ctl "${queue}iosched/back_seek_penalty" 1
 	ctl "${queue}iosched/slice_idle" 0
-	ctl "${queue}iosched/fifo_expire_sync" 150
-	ctl "${queue}iosched/fifo_expire_async" 75
-	ctl "${queue}iosched/slice_sync" 60
-	ctl "${queue}iosched/slice_async" 24
-	ctl "${queue}iosched/low_latency" 0
+	ctl "${queue}iosched/fifo_expire_sync" 250
+	ctl "${queue}iosched/fifo_expire_async" 125
+	ctl "${queue}iosched/slice_sync" 100
+	ctl "${queue}iosched/slice_async" 10
+	ctl "${queue}iosched/low_latency" 1
 	ctl "${queue}iosched/group_idle" 0
 	ctl "${queue}iosched/back_seek_penalty" 1
-	ctl "${queue}iosched/quantum" 8
+	ctl "${queue}iosched/quantum" 16
 	ctl "${queue}iosched/slice_async_rq" 2
 	ctl "${queue}iosched/back_seek_max" 2147483647
 	ctl "${queue}nr_requests" 32
-	ctl "${queue}read_ahead_kb" 64
+	ctl "${queue}read_ahead_kb" 128
 	done
 	
 	for _ in $(seq 2)
 	do
 	# Migrate tasks down at this much load
-	ctl $KERNEL/sched_downmigrate 50
-	ctl $KERNEL/sched_group_downmigrate 50
+	ctl $KERNEL/sched_downmigrate 65
+	ctl $KERNEL/sched_group_downmigrate 65
 	
 	# Migrate tasks up at this much load
-	ctl $KERNEL/sched_upmigrate 65
-	ctl $KERNEL/sched_group_upmigrate 65
+	ctl $KERNEL/sched_upmigrate 75
+	ctl $KERNEL/sched_group_upmigrate 75
 	done
 	
 #GPU Tunables     	
@@ -271,25 +271,26 @@ done
 	ctl $VM/swappiness 100
 	
 	#TOP-APP
-	ctl $ST_TOP/schedtune.boost 27
+	ctl $ST_TOP/schedtune.boost 20
 	ctl $ST_TOP/schedtune.prefer_idle 0
 	
 	kmsg "-------------------------------------------------------------------------------------------------------------
         $(date): THROUGHPUT MODE ACTIVATED --
 -------------------------------------------------------------------------------------------------------------------"
 	# Sucess Message
-	kmsg "LAZY HAS EXECUTED TASK SUCCESSFULLY. ENJOY!"
 	}
 (
 while true; do
   if [ $(top -n 1 -d 1 | head -n 12 | grep -o -e 'netease' -e 'ubisoft' -e 'tencent' -e 'mobile' -e 'gameloft' -e 'garena' -e 'moontoon' -e 'legends' -e 'wildrift' -e 'activision' -e 'battle' -e 'freefireth' -e 'com.miHoYo.GenshinImpact' -e 'genshin' -e 'hokai' -e 'dragon' -e 'konami' -e 'namco' -e 'gamevil' -e 'battle' -e 'impact' -e 'race' -e 'gameloft' -e 'asphalt' -e 'shadow' -e 'valor' | head -n 1) ]; then
-  throughput_start
-  echo "Game detected. activating throughput mode." >> $LOG
-  sleep 25
-  else
-  latency_start
-  echo "No heavy apps detected, activating latency mode." >> $LOG
-  sleep 25
+game=1
+if [ $game -eq 1 ]; then
+throughput_start
+echo "Game detected. activating throughput mode." >> $LOG
+else
+game=2
+latency_start
+echo "No heavy apps detected, activating latency mode." >> $LOG
+ fi
  fi
 done
 )&
