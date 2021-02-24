@@ -66,7 +66,7 @@ fi
 	do
 	# hybrid schedulers priority
 	avail_scheds=`cat "${queue}scheduler"`
-	for sched in bfq-sq maple zen anxiety cfq bfq-mq mq-deadline
+	for sched in maple zen anxiety cfq bfq-mq mq-deadline
 	do
 		if [[ "$avail_scheds" == *"$sched"* ]]
 		then
@@ -125,7 +125,7 @@ do
 	avail_govs="$(cat "$cpu/scaling_available_governors")"
 
 	# Attempt to set the governor in this order
-	for governor in pixutil schedutil_pixel blu_schedutil schedutil
+	for governor in performance schedutil_pixel blu_schedutil schedutil
 	do
 		# Once a matching governor is found, set it and break for this CPU
 		if [[ "$avail_govs" == *"$governor"* ]]

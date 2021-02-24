@@ -77,10 +77,10 @@ fi
 	done
 	ctl "${queue}iosched/back_seek_penalty" 1
 	ctl "${queue}iosched/slice_idle" 1
-	ctl "${queue}iosched/fifo_expire_sync" 24
-	ctl "${queue}iosched/fifo_expire_async" 12
-	ctl "${queue}iosched/slice_sync" 10
-	ctl "${queue}iosched/slice_async" 4
+	ctl "${queue}iosched/fifo_expire_sync" 125
+	ctl "${queue}iosched/fifo_expire_async" 75
+	ctl "${queue}iosched/slice_sync" 60
+	ctl "${queue}iosched/slice_async" 24
 	ctl "${queue}iosched/low_latency" 1
 	ctl "${queue}iosched/group_idle" 1
 	ctl "${queue}iosched/back_seek_penalty" 1
@@ -148,7 +148,7 @@ do
 		ctl "${CPU}schedutil/iowait_boost_enable" 1
 done
 	
-	ctl $VM/vfs_cache_pressure 50
+	ctl $VM/vfs_cache_pressure 200
 	ctl $VM/dirty_background_ratio 3
 	ctl $VM/dirty_ratio 30
 	ctl $VM/dirty_expire_centisecs 3000
@@ -156,7 +156,7 @@ done
 	ctl $VM/swappiness 50
 	
 	#TOP-APP
-	ctl $ST_TOP/schedtune.boost 0
+	ctl $ST_TOP/schedtune.boost 1
 	ctl $ST_TOP/schedtune.prefer_idle 1
 	
 	kmsg "-------------------------------------------------------------------------------------------------------------
@@ -186,7 +186,7 @@ fi
 	do
 	# hybrid schedulers priority
 	avail_scheds=`cat "${queue}scheduler"`
-	for sched in bfq-sq maple zen anxiety cfq bfq-mq mq-deadline
+	for sched in maple zen anxiety cfq bfq-mq mq-deadline
 	do
 		if [[ "$avail_scheds" == *"$sched"* ]]
 		then
@@ -245,7 +245,7 @@ do
 	avail_govs="$(cat "$cpu/scaling_available_governors")"
 
 	# Attempt to set the governor in this order
-	for governor in pixutil schedutil_pixel blu_schedutil schedutil
+	for governor in performance schedutil_pixel blu_schedutil schedutil
 	do
 		# Once a matching governor is found, set it and break for this CPU
 		if [[ "$avail_govs" == *"$governor"* ]]

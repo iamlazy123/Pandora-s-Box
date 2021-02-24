@@ -76,10 +76,10 @@ fi
 	done
 	ctl "${queue}iosched/back_seek_penalty" 1
 	ctl "${queue}iosched/slice_idle" 1
-	ctl "${queue}iosched/fifo_expire_sync" 24
-	ctl "${queue}iosched/fifo_expire_async" 12
-	ctl "${queue}iosched/slice_sync" 10
-	ctl "${queue}iosched/slice_async" 4
+	ctl "${queue}iosched/fifo_expire_sync" 125
+	ctl "${queue}iosched/fifo_expire_async" 75
+	ctl "${queue}iosched/slice_sync" 60
+	ctl "${queue}iosched/slice_async" 24
 	ctl "${queue}iosched/low_latency" 1
 	ctl "${queue}iosched/group_idle" 1
 	ctl "${queue}iosched/back_seek_penalty" 1
@@ -147,7 +147,7 @@ do
 		ctl "${CPU}schedutil/iowait_boost_enable" 1
 done
 	
-	ctl $VM/vfs_cache_pressure 50
+	ctl $VM/vfs_cache_pressure 200
 	ctl $VM/dirty_background_ratio 3
 	ctl $VM/dirty_ratio 30
 	ctl $VM/dirty_expire_centisecs 3000
@@ -155,7 +155,7 @@ done
 	ctl $VM/swappiness 50
 	
 	#TOP-APP
-	ctl $ST_TOP/schedtune.boost 0
+	ctl $ST_TOP/schedtune.boost 1
 	ctl $ST_TOP/schedtune.prefer_idle 1
 	
 	kmsg "-------------------------------------------------------------------------------------------------------------
