@@ -188,7 +188,34 @@ ctl /sys/kernel/fast_charge/force_fast_charge 1
 	ctl ${corectl}min_cpus 1
 	ctl ${corectl}task_thres 4294967295
 	done
-	
+
+sysctl -w kernel.sched_util_clamp_min_rt_default=96
+sysctl -w kernel.sched_util_clamp_min=128
+
+#top-app
+ctl /dev/cpuset/top-app/uclamp.max max
+ctl /dev/cpuset/top-app/uclamp.min 10
+ctl /dev/cpuset/top-app/uclamp.boosted 1
+ctl /dev/cpuset/top-app/uclamp.latency_sensitive 1
+
+#foreground
+ctl /dev/cpuset/foreground/uclamp.max 50
+ctl /dev/cpuset/foreground/uclamp.min 0
+ctl /dev/cpuset/foreground/uclamp.boosted 0
+ctl /dev/cpuset/foreground/uclamp.latency_sensitive 0
+
+#background
+ctl /dev/cpuset/background/uclamp.max max
+ctl /dev/cpuset/background/uclamp.min 20
+ctl /dev/cpuset/background/uclamp.boosted 0
+ctl /dev/cpuset/background/uclamp.latency_sensitive 0
+
+#system-background
+ctl /dev/cpuset/system-background/uclamp.max 40
+ctl /dev/cpuset/system-background/uclamp.min 0
+ctl /dev/cpuset/system-background/uclamp.boosted 0
+ctl /dev/cpuset/system-background/uclamp.latency_sensitive 0
+
 kmsg "-------------------------------------------------------------------------------------------------------------
         CPU OPTIMIZED
 -------------------------------------------------------------------------------------------------------------------"
