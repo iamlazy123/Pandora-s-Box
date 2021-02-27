@@ -88,8 +88,5 @@ pm install $MODPATH/toast.apk
 fi
 # Do install-time script execution
 ui_print ""
-ui_print " Cleaning Set-Up"
-rm -rf /data/dalvik-cache
-ui_print ""
 ui_print "   Thank you for at least trying lazy tweaks! "
 ui_print "  		   Have a Great Day!"
