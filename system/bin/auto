@@ -135,13 +135,13 @@ do
 			break
 		fi
 	done
-		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/up_rate_limit_us 20000
-		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/down_rate_limit_us 20000
+		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/up_rate_limit_us 2500
+		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/down_rate_limit_us 3000
 		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/up_rate_limit_us 10000
-		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/down_rate_limit_us 20000
+		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/down_rate_limit_us 15000
 		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/up_rate_limit_us 10000
-		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/down_rate_limit_us 20000
-		ctl "${CPU}schedutil/rate_limit_us" 20000
+		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/down_rate_limit_us 15000
+		ctl "${CPU}schedutil/rate_limit_us" 15000
 		ctl "${CPU}schedutil/hispeed_load" 90
 		ctl "${CPU}schedutil/hispeed_freq" 0
 		ctl "${CPU}schedutil/pl" 1

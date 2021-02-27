@@ -76,10 +76,10 @@ fi
 	done
 	ctl "${queue}iosched/back_seek_penalty" 1
 	ctl "${queue}iosched/slice_idle" 1
-	ctl "${queue}iosched/fifo_expire_sync" 12
-	ctl "${queue}iosched/fifo_expire_async" 6
-	ctl "${queue}iosched/slice_sync" 5
-	ctl "${queue}iosched/slice_async" 2
+	ctl "${queue}iosched/fifo_expire_sync" 125
+	ctl "${queue}iosched/fifo_expire_async" 75
+	ctl "${queue}iosched/slice_sync" 60
+	ctl "${queue}iosched/slice_async" 24
 	ctl "${queue}iosched/low_latency" 1
 	ctl "${queue}iosched/group_idle" 1
 	ctl "${queue}iosched/back_seek_penalty" 1
@@ -93,8 +93,8 @@ fi
 	for _ in $(seq 2)
 	do
 	# Migrate tasks down at this much load
-	ctl $KERNEL/sched_downmigrate 75
-	ctl $KERNEL/sched_group_downmigrate 75
+	ctl $KERNEL/sched_downmigrate 85
+	ctl $KERNEL/sched_group_downmigrate 85
 	
 	# Migrate tasks up at this much load
 	ctl $KERNEL/sched_upmigrate 95
@@ -102,7 +102,7 @@ fi
 	done
 	
 #GPU Tunables     	
-ctl /sys/class/kgsl/kgsl-3d0/idle_timer 35
+ctl /sys/class/kgsl/kgsl-3d0/idle_timer 54
 ctl /sys/class/kgsl/kgsl-3d0/force_clk_on 0
 ctl /sys/class/kgsl/kgsl-3d0/force_bus_on 0
 ctl /sys/class/kgsl/kgsl-3d0/force_no_nap 0
@@ -134,13 +134,13 @@ do
 			break
 		fi
 	done
-		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/up_rate_limit_us 10000
-		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/down_rate_limit_us 20000
-		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/up_rate_limit_us 40000
-		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/down_rate_limit_us 40000
-		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/up_rate_limit_us 40000
-		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/down_rate_limit_us 40000
-		ctl "${CPU}schedutil/rate_limit_us" 50000
+		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/up_rate_limit_us 3000
+		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/down_rate_limit_us 2500
+		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/up_rate_limit_us 10000
+		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/down_rate_limit_us 12000
+		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/up_rate_limit_us 10000
+		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/down_rate_limit_us 12000
+		ctl "${CPU}schedutil/rate_limit_us" 12000
 		ctl "${CPU}schedutil/hispeed_load" 90
 		ctl "${CPU}schedutil/hispeed_freq" 0
 		ctl "${CPU}schedutil/pl" 0

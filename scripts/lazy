@@ -70,9 +70,6 @@ kmsg "--------------------------------------------------------------------------
 # Sync to data in the rare case a device crashes
 sync
 
-settings put global fstrim_mandatory_interval 86400000 # 1 day
-settings put global storage_benchmark_interval 9223372036854775807 # effectively, never
-
 # Scheduler features 
 if [[ -f "$DBG/sched_features" ]]
 then
@@ -99,13 +96,10 @@ RAM=$(free -m | awk '/Mem:/{print $2}')
 ctl $VM/oom_kill_allocating_task 1
 ctl $VM/block_dump 0
 ctl $VM/panic_on_oom 0
-ctl $VM/overcommit_memory 1
-ctl $VM/overcommit_ratio 100
 ctl $VM/reap_mem_on_sigkill 1
 ctl $VM/oom_dump_tasks 0
 ctl $VM/stat_interval 120
 ctl $VM/extfrag_threshold 750
-ctl $VM/compact_memory 1
 ctl $VM/page-cluster 0
 ctl $FS/lease-break-time 10
 ctl $FS/leases-enable 1
@@ -174,10 +168,10 @@ ctl /proc/sys/net/core/netdev_tstamp_prequeue 0
 ctl /sys/module/msm_performance/parameters/touchboost 1
 #based on mvk's principle for cpu_input boosting
 ctl /sys/module/cpu_input_boost/parameters/input_boost_freq_hp 1400000
-ctl /sys/module/cpu_input_boost/parameters/input_boost_duration 50
+ctl /sys/module/cpu_input_boost/parameters/input_boost_duration 72
 ctl /sys/module/cpu_input_boost/parameters/input_boost_freq_lp 0
 ctl /sys/module/cpu_boost/parameters/input_boost_freq "0:1400000 1:0 2:0 3:0 4:0 5:0 6:0 7:0"
-ctl /sys/module/cpu_boost/parameters/input_boost_ms 50
+ctl /sys/module/cpu_boost/parameters/input_boost_ms 72
 ctl /sys/kernel/fast_charge/force_fast_charge 1
 
 	#based from zenith kernel's core control
@@ -229,21 +223,21 @@ kmsg "--------------------------------------------------------------------------
 	for queue in /sys/block/mmc*/queue/
 	do
 	ctl "${queue}rq_affinity" 2
-	ctl "${queue}rotational" 1
+	ctl "${queue}rotational" 0
 	ctl "${queue}nomerges" 0
 	done
 	
 	for queue in /sys/block/s*/queue/
 	do
 	ctl "${queue}rq_affinity" 2
-	ctl "${queue}rotational" 1
+	ctl "${queue}rotational" 0
 	ctl "${queue}nomerges" 0
 	done
 	
 	for queue in /sys/block/d*/queue/
 	do
 	ctl "${queue}rq_affinity" 2
-	ctl "${queue}rotational" 1
+	ctl "${queue}rotational" 0
 	ctl "${queue}nomerges" 0
 	done
 	
