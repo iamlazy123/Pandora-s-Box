@@ -77,19 +77,18 @@ then
 	ctl $DBG/sched_features NEXT_BUDDY
 	ctl $DBG/sched_features NO_GENTLE_FAIR_SLEEPERS
 	ctl $DBG/sched_features NO_LB_BIAS
-	ctl $DBG/sched_features NO_EAS_PREFER_IDLE
-	ctl $DBG/sched_features NO_FIND_BEST_TARGET
 	ctl $DBG/sched_features NO_NONTASK_CAPACITY
+	ctl $DBG/sched_features NO_RT_RUNTIME_SHARE
 	ctl $DBG/sched_features NO_EAS_USE_NEED_IDLE
 	
 fi
 
 # static kernel parameters
 ctl $KERNEL/sched_schedstats 0
-ctl $KERNEL/sched_nr_migrate 4
+ctl $KERNEL/sched_nr_migrate 8
 ctl $KERNEL/sched_tunable_scaling 0
 ctl $KERNEL/sched_rr_timeslice_ms 1
-ctl $KERNEL/sched_migration_cost_ns 30000000
+ctl $KERNEL/sched_migration_cost_ns 1000000
 
 RAM=$(free -m | awk '/Mem:/{print $2}')
 # VM
@@ -167,11 +166,11 @@ ctl /proc/sys/dev/tty/ldisc_autoload 0
 ctl /proc/sys/net/core/netdev_tstamp_prequeue 0
 ctl /sys/module/msm_performance/parameters/touchboost 1
 #based on mvk's principle for cpu_input boosting
-ctl /sys/module/cpu_input_boost/parameters/input_boost_freq_hp 1400000
-ctl /sys/module/cpu_input_boost/parameters/input_boost_duration 72
-ctl /sys/module/cpu_input_boost/parameters/input_boost_freq_lp 0
+ctl /sys/module/cpu_input_boost/parameters/input_boost_freq_hp 1100000
+ctl /sys/module/cpu_input_boost/parameters/input_boost_duration 58
+ctl /sys/module/cpu_input_boost/parameters/input_boost_freq_lp 1000000
 ctl /sys/module/cpu_boost/parameters/input_boost_freq "0:1400000 1:0 2:0 3:0 4:0 5:0 6:0 7:0"
-ctl /sys/module/cpu_boost/parameters/input_boost_ms 72
+ctl /sys/module/cpu_boost/parameters/input_boost_ms 58
 ctl /sys/kernel/fast_charge/force_fast_charge 1
 
 	#based from zenith kernel's core control
@@ -241,10 +240,6 @@ kmsg "--------------------------------------------------------------------------
 	ctl "${queue}nomerges" 0
 	done
 	
-	# STUNE
-	ctl $ST_FORE/schedtune.sched_boost_no_override 0
-	ctl $ST_TOP/schedtune.sched_boost_no_override 0
-	
 kmsg "-------------------------------------------------------------------------------------------------------------
          I/O OPTIMIZATIONS APPLIED
 -------------------------------------------------------------------------------------------------------------------"
@@ -272,70 +267,112 @@ done
 kmsg "-------------------------------------------------------------------------------------------------------------
          DISABLED GPU DEBUGGING
 -------------------------------------------------------------------------------------------------------------------"
-boot_run_once=false
-lazy_mode=$(getprop persist.lazy.mode)
+kmsg "-------------------------------------------------------------------------------------------------------------
+         OVERRIDING KERNEL PARAMETERS --
+-------------------------------------------------------------------------------------------------------------------"
 
+# Kernel
+if [ -d $KERNEL ]; then
+ctl $KERNEL/perf_cpu_time_max_percent 15
+ctl $KERNEL/sched_min_task_util_for_boost_colocation 0
+ctl $KERNEL/sched_autogroup_enabled 0
+ctl $KERNEL/sched_child_runs_first 1
+ctl $KERNEL/sched_latency_ns 1000000
+ctl $KERNEL/sched_min_granularity_ns 100000
+ctl $KERNEL/sched_wakeup_granularity_ns 500000
+ctl $KERNEL/sched_rt_runtime_us -1
+ctl $KERNEL/sched_initial_task_util 0
+fi
+	for queue in /sys/block/*/queue/
+	do
+	# hybrid schedulers priority
+	avail_scheds=`cat "${queue}scheduler"`
+	for sched in bfq-sq anxiety tripndroid maple zen fiops cfq bfq-mq mq-deadline
+	do
+		if [[ "$avail_scheds" == *"$sched"* ]]
+		then
+			ctl "${queue}scheduler" "$sched"
+			break
+		fi
+	done
+	ctl "${queue}iosched/slice_idle" 0
+	ctl "${queue}iosched/low_latency" 1
+	ctl "${queue}iosched/group_idle" 0
+	ctl "${queue}iosched/back_seek_penalty" 1
+	ctl "${queue}iosched/slice_async_rq" 1
+	ctl "${queue}iosched/back_seek_max" 214748364
+	ctl "${queue}nr_requests" 32
+	ctl "${queue}read_ahead_kb" 32
+	done
+	
+	for _ in $(seq 2)
+	do
+	# Migrate tasks down at this much load
+	ctl $KERNEL/sched_downmigrate 65
+	ctl $KERNEL/sched_group_downmigrate 65
+	
+	# Migrate tasks up at this much load
+	ctl $KERNEL/sched_upmigrate 85
+	ctl $KERNEL/sched_group_upmigrate 85
+	done
+	
+#GPU Tunables     	
+ctl /sys/class/kgsl/kgsl-3d0/idle_timer 64
+ctl /sys/class/kgsl/kgsl-3d0/force_clk_on 0
+ctl /sys/class/kgsl/kgsl-3d0/force_bus_on 0
+ctl /sys/class/kgsl/kgsl-3d0/force_no_nap 0
+ctl /sys/class/kgsl/kgsl-3d0/devfreq/adrenoboost 1
+ctl /sys/class/kgsl/kgsl-3d0/force_rail_on 0
+ctl /sys/class/kgsl/kgsl-3d0/bus_split 1
+ctl /sys/class/kgsl/kgsl-3d0/throttling 0
 
-
-(
-while true
+if [ -e "/sys/module/adreno_idler" ]; then
+	ctl /sys/module/adreno_idler/parameters/adreno_idler_active "N"
+fi
+	
+# Loop over each CPU in the system
+for cpu in /sys/devices/system/cpu/cpu*/cpufreq
 do
-	sleep 15
-	sync
-    mode=$(getprop persist.lazy.mode)
-    if $boot_run_once
-    then
-        [ "$(getprop persist.lazy.mode)" == "$lazy_mode" ] && continue
-    else
-        boot_run_once=true
-    fi
-    lazy_mode=$(getprop persist.lazy.mode)
-    case "$lazy_mode" in
-    # SWITCH BRANCH
-        "1") {
-kmsg "-------------------------------------------------------------------------------------------------------------
-        $(date): AUTOMATIC MODE STARTING
--------------------------------------------------------------------------------------------------------------------"
-sync
-auto
-kmsg "-------------------------------------------------------------------------------------------------------------
-       $(date): AUTO MODE ACTIVE
--------------------------------------------------------------------------------------------------------------------"
-cmode="AUTOMATIC MODE ACTIVE"
-toast
-	};;
-       # Lazy Profile
-        "3") {
-killall auto
-stop auto
-bal
-cmode="BALANCED MODE ACTIVATED"
-toast
-	};;
-# Performance Profile
-        "4") {
-killall auto
-stop auto
-lat
-cmode="LATENCY MODE ACTIVATED"
-toast
-	};;
-	# Battery Profile
-        "2") {
-killall auto
-stop auto
-cons
-cmode="CONSERVATIVE MODE ACTIVATED"
-toast
-	};;
-# Gaming Profile
-        "5") {
-killall auto
-stop auto
-through
-cmode="THROUGHPUT MODE ACTIVATED"
-toast
-};;
-esac
+	# Fetch the available governors from the CPU
+	avail_govs="$(cat "$cpu/scaling_available_governors")"
+
+	# Attempt to set the governor in this order
+	for governor in juggernaut blu_schedutil alucardsched schedutil_pixel schedutil interactive
+	do
+		# Once a matching governor is found, set it and break for this CPU
+		if [[ "$avail_govs" == *"$governor"* ]]
+		then
+			ctl "$cpu/scaling_governor" "$governor"
+			break
+		fi
+	done
+		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/up_rate_limit_us 2500
+		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/down_rate_limit_us 3000
+		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/up_rate_limit_us 10000
+		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/down_rate_limit_us 12000
+		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/up_rate_limit_us 10000
+		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/down_rate_limit_us 12000
+		ctl "${CPU}schedutil/rate_limit_us" 12000
+		ctl "${CPU}schedutil/hispeed_load" 90
+		ctl "${CPU}schedutil/hispeed_freq" 0
+		ctl "${CPU}schedutil/pl" 1
+		ctl "${CPU}schedutil/iowait_boost_enable" 1
 done
-) &
+	
+	ctl $VM/vfs_cache_pressure 500
+	ctl $VM/dirty_background_ratio 10
+	ctl $VM/dirty_ratio 50
+	ctl $VM/dirty_expire_centisecs 3000
+	ctl $VM/dirty_writeback_centisecs 3000
+	
+	#TOP-APP
+	ctl $ST_TOP/schedtune.boost 0
+	ctl $ST_FORE/schedtune.prefer_idle 1
+	ctl $ST_TOP/schedtune.prefer_idle 1
+	
+	kmsg "-------------------------------------------------------------------------------------------------------------
+        $(date): KERNEL PARAMETERS OVERRIDEN --
+-------------------------------------------------------------------------------------------------------------------"
+	# Sucess Message
+	kmsg "LAZY HAS EXECUTED TASK SUCCESSFULLY. ENJOY!"
+	
