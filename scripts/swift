@@ -162,8 +162,8 @@ rm $LOG
 # fix laggy bilibili feed scrolling
 change_task_cgroup "servicemanager" "top-app" "cpuset"
 change_task_cgroup "servicemanager" "foreground" "stune"
-change_task_cgroup "crtc_commit" "background" "cpuset"
-change_task_cgroup "crtc_commit" "background" "stune"
+change_task_cgroup "crtc_commit" "top-app" "cpuset"
+change_task_cgroup "crtc_commit" "foreground" "stune"
 # fix laggy home gesture
 change_task_cgroup "system_server" "top-app" "cpuset"
 change_task_cgroup "system_server" "foreground" "stune"
@@ -172,7 +172,7 @@ kmsg "=======================================================================
 
 # reduce render thread waiting time
 change_task_cgroup "surfaceflinger" "top-app" "cpuset"
-change_task_cgroup "surfaceflinger" "top-app" "stune"
+change_task_cgroup "surfaceflinger" "foreground" "stune"
 kmsg "=======================================================================
          TASK OPTIMIZED"
 
@@ -181,11 +181,8 @@ change_task_nice "kswapd0" "-2"
 change_task_nice "oom_reaper" "-2"
 change_task_affinity "kswapd0" "7f"
 change_task_affinity "oom_reaper" "7f"
-change_task_cgroup "kswapd" "foreground" "cpuset"
-change_task_cgroup "oom_reaper" "foreground" "cpuset"
-change_task_affinity "surfaceflinger" "ff"
-change_task_ionice "surfaceflinger" "7"
-change_task_ionice "composer" "7"
+change_task_cgroup "kswapd" "background" "cpuset"
+change_task_cgroup "oom_reaper" "background" "cpuset"
 kmsg "=======================================================================
          RENDERING UNLOCKED"
 # changing priority of system services for less aggressive google services and better services management
@@ -203,7 +200,7 @@ kmsg "=======================================================================
          CGROUPS OPTIMIZED"
 xargs -rn 1 sh -c "$(typeset -p|grep -vE '(-r)|(-A)'; typeset -f);"' 
 change_task_cgroup "$@" "top-app" "cpuset"; 
-change_task_cgroup "$@" "top-app" "stune"; 
+change_task_cgroup "$@" "foreground" "stune"; 
 kmsg "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
          OPTIMIZING $@"' _ < $APPLIST
 ###############################
