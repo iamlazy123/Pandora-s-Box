@@ -287,7 +287,7 @@ fi
 	do
 	# hybrid schedulers priority
 	avail_scheds=`cat "${queue}scheduler"`
-	for sched in bfq-sq anxiety tripndroid maple zen fiops cfq bfq-mq mq-deadline
+	for sched in bfq-sq anxiety maple zen cfq bfq-mq none
 	do
 		if [[ "$avail_scheds" == *"$sched"* ]]
 		then
@@ -332,7 +332,7 @@ do
 	avail_govs="$(cat "$cpu/scaling_available_governors")"
 
 	# Attempt to set the governor in this order
-	for governor in juggernaut blu_schedutil alucardsched schedutil_pixel schedutil interactive
+	for governor in blu_schedutil schedutil_pixel alucardsched schedutil interactive
 	do
 		# Once a matching governor is found, set it and break for this CPU
 		if [[ "$avail_govs" == *"$governor"* ]]
@@ -347,7 +347,7 @@ do
 		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/down_rate_limit_us 12000
 		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/up_rate_limit_us 10000
 		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/down_rate_limit_us 12000
-		ctl "${CPU}schedutil/rate_limit_us" 12000
+		ctl "${CPU}schedutil/rate_limit_us" 10000
 		ctl "${CPU}schedutil/hispeed_load" 90
 		ctl "${CPU}schedutil/hispeed_freq" 0
 		ctl "${CPU}schedutil/pl" 1
