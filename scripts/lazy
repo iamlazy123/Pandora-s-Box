@@ -369,5 +369,7 @@ done
         $(date): KERNEL PARAMETERS OVERRIDEN --
 -------------------------------------------------------------------------------------------------------------------"
 	# Sucess Message
+	cmode="LAZY HAS EXECUTED TASK SUCCESSFULLY. ENJOY!"
+	toast
 	kmsg "LAZY HAS EXECUTED TASK SUCCESSFULLY. ENJOY!"
 	
