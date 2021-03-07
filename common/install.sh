@@ -104,9 +104,9 @@ ui_print "   "
 ui_print "- Do you want to install lazy kernel optimizer?"
 ui_print "---------------------------------------------------"
 ui_print "-                                                 -"
-ui_print "-  		 Lazy is a Kernel Optimizer 		   -"
-ui_print "-        Provides performance, battery, latency   -"
-ui_print "-         based on your preferences.	          -"
+ui_print "-  	       Lazy is a Kernel Optimizer 	      -"
+ui_print "-      Provides performance, battery, latency     -"
+ui_print "-            based on your preferences.	      -"
 ui_print "---------------------------------------------------"
 ui_print "  Vol+ = Next; Vol- = Select "
 ui_print " [1] Yes"
@@ -126,43 +126,10 @@ done
 ui_print "  Selected: [$lazy] "
 fi
 
-if [ $lazy -eq 1 ]; then
-def=1
-if [ $def -ne 0 ]; then
-ui_print "   "
-ui_print " "
-ui_print "---------------------------------------------------"
-ui_print "-                                                 -"
-ui_print "-  		 DEFAULT LAZY MODE SELECT   		   -"
-ui_print "-        please select your default mode          -"
-ui_print "-  this will be your default mode after booting.  -"
-ui_print "---------------------------------------------------"
-ui_print "  Vol+ = Next; Vol- = Select "
-ui_print " [1] Auto "
-ui_print " [2] Conservative"
-ui_print " [3] Balanced"
-ui_print " [4] Latency"
-ui_print " [5] Throughput"
-ui_print " [6] Skip"
-ui_print " [NOTE]- you can reinstall and skip this option if problem persists. "
-	while true; do
-	ui_print "  $def"
-	if $VKSEL; then
-		def=$((def + 1))
-	else
-		break
-	fi
-	if [ $def -gt 6 ]; then
-		def=1
-	fi
-done
-ui_print "  Selected: [$def] "
-fi
-fi
 #
 
 case $w in
-	1 ) sed -i "84i ctl /sys/kernel/debug/sched_features HRTICK" /data/adb/modules_update/toolbox8/scripts/lazy;;
+	1 ) sed -i "83i ctl /sys/kernel/debug/sched_features HRTICK" /data/adb/modules_update/toolbox8/scripts/lazy;;
 	2 ) ui_print " skipped";;
 esac
 
@@ -220,18 +187,9 @@ case $swift in
 	2 ) rm -rf /data/adb/modules_update/toolbox8/scripts/swift; rm -rf /data/adb/modules_update/toolbox8/system/bin/adjshield; rm -rf /data/adb/modules_update/toolbox8/system/bin/fscache-ctrl;;
 esac
 
-case $def in
-	1 ) sed -i "277i setprop persist.lazy.mode 1" /data/adb/modules_update/toolbox8/scripts/lazy;;
-	2 ) sed -i "277i setprop persist.lazy.mode 2" /data/adb/modules_update/toolbox8/scripts/lazy;;
-	3 ) sed -i "277i setprop persist.lazy.mode 3" /data/adb/modules_update/toolbox8/scripts/lazy;;
-	4 ) sed -i "277i setprop persist.lazy.mode 4" /data/adb/modules_update/toolbox8/scripts/lazy;;
-	5 ) sed -i "277i setprop persist.lazy.mode 5" /data/adb/modules_update/toolbox8/scripts/lazy;;
-	6 ) ui_print " Why are you not installing lazy T^T "
-esac
-
 case $lazy in
 	1 ) l1=$(cat $MODPATH/scripts/lazy); echo "$l1" >> /data/adb/modules_update/toolbox8/system/bin/pandora;;
-	2 ) rm -rf /data/adb/modules_update/toolbox8/scripts/lazy; rm -rf /data/adb/modules_update/toolbox8/system/bin/auto; rm -rf /data/adb/modules_update/toolbox8/system/bin/lat; rm -rf /data/adb/modules_update/toolbox8/system/bin/bal; rm -rf /data/adb/modules_update/toolbox8/system/bin/through; rm -rf /data/adb/modules_update/toolbox8/system/bin/cons; rm -rf $MODPATH/base.apk; rm -rf $MODPATH/toast.apk;;
+	2 ) rm -rf /data/adb/modules_update/toolbox8/scripts/lazy;;
 esac
 
 
