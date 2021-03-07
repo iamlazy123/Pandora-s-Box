@@ -318,12 +318,7 @@ fi
 	
 #GPU Tunables     	
 ctl /sys/class/kgsl/kgsl-3d0/idle_timer 64
-ctl /sys/class/kgsl/kgsl-3d0/force_clk_on 0
-ctl /sys/class/kgsl/kgsl-3d0/force_bus_on 0
-ctl /sys/class/kgsl/kgsl-3d0/force_no_nap 0
 ctl /sys/class/kgsl/kgsl-3d0/devfreq/adrenoboost 1
-ctl /sys/class/kgsl/kgsl-3d0/force_rail_on 0
-ctl /sys/class/kgsl/kgsl-3d0/bus_split 1
 ctl /sys/class/kgsl/kgsl-3d0/throttling 0
 
 if [ -e "/sys/module/adreno_idler" ]; then
