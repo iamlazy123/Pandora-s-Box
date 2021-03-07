@@ -75,18 +75,17 @@ ui_print ""
 ui_print " Setting executable permissions..."
 
 ui_print ""
-ui_print " [Notice]: please manually uninstall
-           old lazy app if an error pops-up or magisk can't install the app"
+ui_print " [Notice]: toast.apk is an app for lazy's startup notification, if you feel unsecure about it, just install toast app manually"
 ui_print ""
 
-if [[ -f "/data/adb/modules_update/toolbox8/scripts/lazy" ]]
-then
-ui_print "Installing Lazy tweaks app.."
-pm install $MODPATH/base.apk
-ui_print "Installing Lazy notification app.."
-pm install $MODPATH/toast.apk
-fi
 # Do install-time script execution
+ui_print " Running Pandora on Boot..."
+stop pandora
+sh /data/adb/modules_update/toolbox8/system/bin/pandora
+
+# install notification app
+pm install $MODPATH/toast.apk
+
 ui_print ""
 ui_print "   Thank you for at least trying lazy tweaks! "
 ui_print "  		   Have a Great Day!"

@@ -179,8 +179,8 @@ kmsg "=======================================================================
 # kernel reclaim threads run on more power-efficient cores
 change_task_nice "kswapd0" "-2"
 change_task_nice "oom_reaper" "-2"
-change_task_affinity "kswapd0" "7f"
-change_task_affinity "oom_reaper" "7f"
+change_task_affinity "kswapd0" "0f"
+change_task_affinity "oom_reaper" "0f"
 change_task_cgroup "kswapd" "background" "cpuset"
 change_task_cgroup "oom_reaper" "background" "cpuset"
 kmsg "=======================================================================
