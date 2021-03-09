@@ -17,7 +17,6 @@ KERNEL="/proc/sys/kernel"
 DBG="/sys/kernel/debug"
 #------------------------------------===#
 #------------------------------------===#
-setprop lazy.support 1
 ###############################
 rm $LOG
 
@@ -88,7 +87,7 @@ ctl $KERNEL/sched_schedstats 0
 ctl $KERNEL/sched_nr_migrate 8
 ctl $KERNEL/sched_tunable_scaling 0
 ctl $KERNEL/sched_rr_timeslice_ms 1
-ctl $KERNEL/sched_migration_cost_ns 1000000
+ctl $KERNEL/sched_migration_cost_ns 30000000
 
 RAM=$(free -m | awk '/Mem:/{print $2}')
 # VM
@@ -106,7 +105,7 @@ ctl $FS/dir-notify-enable 0
 
 parameter_adj=$LMK/adj
 if [ -e $parameter_adj ]; then
-  ctl $parameter_adj "0,58,250,550,850,1000"
+  ctl $parameter_adj "0,100,250,500,800,1000"
 fi
 
 parameter_oom_reaper=$LMK/oom_reaper
@@ -122,9 +121,9 @@ fi
 front=$((($RAM*2/100)*1024/4))
 visible=$((($RAM*3/100)*1024/4))
 Second=$((($RAM*5/100)*1024/4))
-Hidden=$((($RAM*6/100)*1024/4))
-content=$((($RAM*7/100)*1024/4))
-empty=$((($RAM*10/100)*1024/4))
+Hidden=$((($RAM*7/100)*1024/4))
+content=$((($RAM*8/100)*1024/4))
+empty=$((($RAM*11/100)*1024/4))
 	
 ctl $LMK/minfree "$front,$visible,$Second,$Hidden,$content,$empty"
 kmsg "-------------------------------------------------------------------------------------------------------------
@@ -164,12 +163,11 @@ ctl /sys/kernel/rcu_expedited 0
 ctl /sys/kernel/rcu_normal 1
 ctl /proc/sys/dev/tty/ldisc_autoload 0
 ctl /proc/sys/net/core/netdev_tstamp_prequeue 0
-ctl /sys/module/msm_performance/parameters/touchboost 1
-#based on mvk's principle for cpu_input boosting
-ctl /sys/module/cpu_input_boost/parameters/input_boost_freq_hp 1100000
+ctl /sys/module/msm_performance/parameters/touchboost 0
+ctl /sys/module/cpu_input_boost/parameters/input_boost_freq_hp 0
 ctl /sys/module/cpu_input_boost/parameters/input_boost_duration 58
-ctl /sys/module/cpu_input_boost/parameters/input_boost_freq_lp 1000000
-ctl /sys/module/cpu_boost/parameters/input_boost_freq "0:1400000 1:0 2:0 3:0 4:0 5:0 6:0 7:0"
+ctl /sys/module/cpu_input_boost/parameters/input_boost_freq_lp 0
+ctl /sys/module/cpu_boost/parameters/input_boost_freq "0:0 1:0 2:0 3:0 4:0 5:0 6:0 7:0"
 ctl /sys/module/cpu_boost/parameters/input_boost_ms 58
 ctl /sys/kernel/fast_charge/force_fast_charge 1
 
@@ -259,7 +257,7 @@ for i in $(find /sys/ -name enable_event_log); do
  ctl $i 0;
 done
 for i in $(find /sys/ -name log_ecn_error); do
- ctl $i 0;
+ ctl $i N;
 done
 for i in $(find /sys/ -name snapshot_crashdumper); do
  ctl $i 0;
@@ -273,7 +271,7 @@ kmsg "--------------------------------------------------------------------------
 
 # Kernel
 if [ -d $KERNEL ]; then
-ctl $KERNEL/perf_cpu_time_max_percent 15
+ctl $KERNEL/perf_cpu_time_max_percent 7
 ctl $KERNEL/sched_min_task_util_for_boost_colocation 0
 ctl $KERNEL/sched_autogroup_enabled 0
 ctl $KERNEL/sched_child_runs_first 1
@@ -287,7 +285,7 @@ fi
 	do
 	# hybrid schedulers priority
 	avail_scheds=`cat "${queue}scheduler"`
-	for sched in bfq-sq anxiety maple zen cfq bfq-mq none
+	for sched in none
 	do
 		if [[ "$avail_scheds" == *"$sched"* ]]
 		then
@@ -308,17 +306,17 @@ fi
 	for _ in $(seq 2)
 	do
 	# Migrate tasks down at this much load
-	ctl $KERNEL/sched_downmigrate 65
-	ctl $KERNEL/sched_group_downmigrate 65
+	ctl $KERNEL/sched_downmigrate 90
+	ctl $KERNEL/sched_group_downmigrate 90
 	
 	# Migrate tasks up at this much load
-	ctl $KERNEL/sched_upmigrate 85
-	ctl $KERNEL/sched_group_upmigrate 85
+	ctl $KERNEL/sched_upmigrate 100
+	ctl $KERNEL/sched_group_upmigrate 100
 	done
 	
 #GPU Tunables     	
-ctl /sys/class/kgsl/kgsl-3d0/idle_timer 64
-ctl /sys/class/kgsl/kgsl-3d0/devfreq/adrenoboost 1
+ctl /sys/class/kgsl/kgsl-3d0/idle_timer 58
+ctl /sys/class/kgsl/kgsl-3d0/devfreq/adrenoboost 0
 ctl /sys/class/kgsl/kgsl-3d0/throttling 0
 
 if [ -e "/sys/module/adreno_idler" ]; then
@@ -328,26 +326,13 @@ fi
 # Loop over each CPU in the system
 for cpu in /sys/devices/system/cpu/cpu*/cpufreq
 do
-	# Fetch the available governors from the CPU
-	avail_govs="$(cat "$cpu/scaling_available_governors")"
-
-	# Attempt to set the governor in this order
-	for governor in blu_schedutil schedutil_pixel alucardsched schedutil interactive
-	do
-		# Once a matching governor is found, set it and break for this CPU
-		if [[ "$avail_govs" == *"$governor"* ]]
-		then
-			ctl "$cpu/scaling_governor" "$governor"
-			break
-		fi
-	done
 		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/up_rate_limit_us 2500
 		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/down_rate_limit_us 3000
-		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/up_rate_limit_us 10000
-		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/down_rate_limit_us 12000
-		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/up_rate_limit_us 10000
-		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/down_rate_limit_us 12000
-		ctl "${CPU}schedutil/rate_limit_us" 10000
+		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/up_rate_limit_us 2500
+		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/down_rate_limit_us 3000
+		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/up_rate_limit_us 5000
+		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/down_rate_limit_us 5000
+		ctl "${CPU}schedutil/rate_limit_us" 5000
 		ctl "${CPU}schedutil/hispeed_load" 90
 		ctl "${CPU}schedutil/hispeed_freq" 0
 		ctl "${CPU}schedutil/pl" 1

@@ -107,7 +107,6 @@ ps_ret="$(ps -Ao pid,args)"
 for temp_pid in $(echo "$ps_ret" | grep "$1" | awk '{print $1}'); do
 for temp_tid in $(ls "/proc/$temp_pid/task/"); do
 echo "$temp_tid" > "/dev/$3/$2/tasks"
-echo "-1000" > "/proc/$temp_tid/oom_score_adj"
 done
 done
 }
@@ -177,10 +176,9 @@ kmsg "=======================================================================
          TASK OPTIMIZED"
 
 # kernel reclaim threads run on more power-efficient cores
-change_task_nice "kswapd0" "-2"
 change_task_nice "oom_reaper" "-2"
-change_task_affinity "kswapd0" "0f"
-change_task_affinity "oom_reaper" "0f"
+change_task_affinity "kswapd0" "7f"
+change_task_affinity "oom_reaper" "7f"
 change_task_cgroup "kswapd" "background" "cpuset"
 change_task_cgroup "oom_reaper" "background" "cpuset"
 kmsg "=======================================================================
@@ -192,7 +190,7 @@ change_task_nice "deletescape" "-6"
 change_task_nice "trebuchet" "-6"
 change_task_nice "fluid" "-9"
 change_task_nice "composer" "-20"
-change_task_nice "kswapd0" "1"
+change_task_nice "kswapd0" "-2"
 change_task_nice "surfaceflinger" "-20"
 change_task_nice "servicemanager" "-6"
 change_task_nice "msm_irqbalance" "-5"
