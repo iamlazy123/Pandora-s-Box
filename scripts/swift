@@ -180,7 +180,6 @@ change_task_affinity "kswapd0" "7f"
 change_task_affinity "oom_reaper" "7f"
 change_task_cgroup "kswapd" "background" "cpuset"
 change_task_cgroup "oom_reaper" "background" "cpuset"
-change_task_affinity "surfaceflinger" "ff"
 change_task_ionice "surfaceflinger" "7"
 change_task_ionice "composer" "7"
 kmsg "=======================================================================
