@@ -117,7 +117,7 @@ ctl $FS/dir-notify-enable 0
 
 parameter_adj=$LMK/adj
 if [ -e $parameter_adj ]; then
-  ctl $parameter_adj "0,58,250,550,850,1000"
+  ctl $parameter_adj "0,100,250,500,800,1000"
 fi
 
 parameter_oom_reaper=$LMK/oom_reaper
