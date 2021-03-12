@@ -82,7 +82,8 @@ adjshield_status()
 {
     local err
     if [ "$(ps -A | grep "$ADJSHIELD_NAME")" != "" ]; then
-        echo "Running. See $adjshield_log for details."
+        echo "[-]======================================================================
+         RUNNING.. $adjshield_log for details."
     else
         # "Error: Log file not found"
         err="$(cat "$adjshield_log" | grep Error | head -n 1 | cut -d: -f2)"
@@ -297,6 +298,8 @@ pin_proc_on_perf()
 
 rm $LOG
 
+kmsg "=======================================================================
+        RUNNING UPERF USERSPACE MODS by (matt yang)...."
 #codes from uperf by matt yang
  # Reduce Perf Cluster Wakeup
     # daemons
@@ -397,7 +400,9 @@ for f in $(find /sys/devices/virtual/workqueue "cpumask"); do
 done
 
 # End of uperf codes from matt yang
-
+kmsg "=======================================================================
+         UPERF USERSPACE MODS by (matt yang) APPLIED...."
+         
 # kernel reclaim threads run on more power-efficient cores
 change_task_nice "oom_reaper" "-2"
 change_task_affinity "kswapd0" "7f"
@@ -405,7 +410,8 @@ change_task_affinity "oom_reaper" "7f"
 change_task_ionice "surfaceflinger" "7"
 change_task_ionice "composer" "7"
 kmsg "=======================================================================
-         RENDERING UNLOCKED"
+         PROCESSES' IONICE AND AFFINITIES CHANGED..."
+         
 # changing priority of system services for less aggressive google services and better services management
 change_task_nice "system_server" "-6"
 change_task_nice "launcher" "-6"
@@ -418,12 +424,13 @@ change_task_nice "surfaceflinger" "-20"
 change_task_nice "servicemanager" "-6"
 change_task_nice "msm_irqbalance" "-5"
 kmsg "=======================================================================
-         CGROUPS OPTIMIZED"
+         SETTING PROCESSES' PRIORITIES..."
+         
 xargs -rn 1 sh -c "$(typeset -p|grep -vE '(-r)|(-A)'; typeset -f);"' 
 change_task_cgroup "$@" "top-app" "cpuset"; 
 change_task_cgroup "$@" "foreground" "stune"; 
 kmsg "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-         OPTIMIZING $@"' _ < $APPLIST
+         PLACING YOUR APPS TO TOP PRIORITY, PACKAGE NAME: $@"' _ < $APPLIST
 
 # QTI mem opt
 ###############################
@@ -555,11 +562,16 @@ fscc_status()
     # get the correct value after waiting for fscc loading files
     sleep 15
     if [ "$(ps -A | grep "$FSCC_NAME")" != "" ]; then
-        echo "Running. $(cat /proc/meminfo | grep Mlocked | cut -d: -f2 | tr -d ' ') in cache."
+        echo "[-]======================================================================
+         RUNNING.. $(cat /proc/meminfo | grep Mlocked | cut -d: -f2 | tr -d ' ') IN CACHE."
     else
         echo "Not running."
     fi
 }
+
+kmsg "=======================================================================
+       STARTING FSCACHE...."
+       
 # similiar to PinnerService, Mlock(Unevictable) 200~350MB
 fscc_add_obj "$SYS_FRAME/framework.jar"
 fscc_add_obj "$SYS_FRAME/services.jar"
@@ -592,6 +604,7 @@ fscc_add_apex_lib "bouncycastle.jar"
 fscc_stop
 fscc_start
 fscc_status
+
 kmsg "=======================================================================
        FSCACHE OPTIMIZED AND RUNNING"
 # start adjshield
@@ -599,7 +612,5 @@ kmsg "=======================================================================
 adjshield_stop
 adjshield_start
 
-kmsg "=======================================================================
-       RUNTIME TWEAKS APPLIED"
 # save mode for automatic applying mode after reboot
 save_panel
