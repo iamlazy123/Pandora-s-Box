@@ -42,20 +42,12 @@ ctl() {
 	# Log the success
 	kmsg "$1 $curval -> $2"
 }
-
-toast() {
- am start -a android.intent.action.MAIN -e toasttext "$cmode" -n bellavita.toast/.MainActivity
-}
 latency_start() {
-kmsg "-------------------------------------------------------------------------------------------------------------
-         LATENCY MODE IS STARTING --
--------------------------------------------------------------------------------------------------------------------"
-
 # Kernel
 if [ -d $KERNEL ]; then
 ctl $KERNEL/perf_cpu_time_max_percent 3
 ctl $KERNEL/sched_min_task_util_for_boost_colocation 0
-ctl $KERNEL/sched_autogroup_enabled 1
+ctl $KERNEL/sched_autogroup_enabled 0
 ctl $KERNEL/sched_child_runs_first 1
 ctl $KERNEL/sched_latency_ns 1000000
 ctl $KERNEL/sched_min_granularity_ns 100000
@@ -65,9 +57,9 @@ ctl $KERNEL/sched_initial_task_util 0
 fi
 	for queue in /sys/block/*/queue/
 	do
-	# hybrid schedulers priority
+	# skip kyber and mq-deadline
 	avail_scheds=`cat "${queue}scheduler"`
-	for sched in bfq-sq anxiety maple zen tripndroid fiops cfq kyber
+	for sched in none
 	do
 		if [[ "$avail_scheds" == *"$sched"* ]]
 		then
@@ -75,27 +67,13 @@ fi
 			break
 		fi
 	done
-	ctl "${queue}iosched/back_seek_penalty" 1
-	ctl "${queue}iosched/slice_idle" 1
-	ctl "${queue}iosched/fifo_expire_sync" 125
-	ctl "${queue}iosched/fifo_expire_async" 75
-	ctl "${queue}iosched/slice_sync" 60
-	ctl "${queue}iosched/slice_async" 24
-	ctl "${queue}iosched/low_latency" 1
-	ctl "${queue}iosched/group_idle" 1
-	ctl "${queue}iosched/back_seek_penalty" 1
-	ctl "${queue}iosched/quantum" 4
-	ctl "${queue}iosched/slice_async_rq" 1
-	ctl "${queue}iosched/back_seek_max" 2147483647
-	ctl "${queue}nr_requests" 32
-	ctl "${queue}read_ahead_kb" 32
 	done
 	
 	for _ in $(seq 2)
 	do
 	# Migrate tasks down at this much load
-	ctl $KERNEL/sched_downmigrate 65
-	ctl $KERNEL/sched_group_downmigrate 65
+	ctl $KERNEL/sched_downmigrate 75
+	ctl $KERNEL/sched_group_downmigrate 75
 	
 	# Migrate tasks up at this much load
 	ctl $KERNEL/sched_upmigrate 75
@@ -103,30 +81,18 @@ fi
 	done
 	
 #GPU Tunables     	
-ctl /sys/class/kgsl/kgsl-3d0/idle_timer 64
-ctl /sys/class/kgsl/kgsl-3d0/force_clk_on 0
-ctl /sys/class/kgsl/kgsl-3d0/force_bus_on 0
-ctl /sys/class/kgsl/kgsl-3d0/force_no_nap 0
-ctl /sys/class/kgsl/kgsl-3d0/devfreq/adrenoboost 0
-ctl /sys/class/kgsl/kgsl-3d0/force_rail_on 0
-ctl /sys/class/kgsl/kgsl-3d0/bus_split 1
-ctl /sys/class/kgsl/kgsl-3d0/throttling 1
-
-if [ -e "/sys/module/adreno_idler" ]; then
-	ctl /sys/module/adreno_idler/parameters/adreno_idler_active "Y"
-	ctl /sys/module/adreno_idler/parameters/adreno_idler_idleworkload "7000"
-	ctl /sys/module/adreno_idler/parameters/adreno_idler_downdifferential '15'
-	ctl /sys/module/adreno_idler/parameters/adreno_idler_idlewait '15'
-fi
+ctl /sys/class/kgsl/kgsl-3d0/idle_timer 58
+ctl /sys/class/kgsl/kgsl-3d0/devfreq/adrenoboost 1
+ctl /sys/class/kgsl/kgsl-3d0/throttling 0
 	
-# Loop over each CPU in the system
+# tune governor
 for cpu in /sys/devices/system/cpu/cpu*/cpufreq
 do
 	# Fetch the available governors from the CPU
 	avail_govs="$(cat "$cpu/scaling_available_governors")"
 
 	# Attempt to set the governor in this order
-	for governor in juggernaut pixutil alucardsched schedutil_pixel blu_schedutil schedutil interactive
+	for governor in blu_schedutil schedutil interactive
 	do
 		# Once a matching governor is found, set it and break for this CPU
 		if [[ "$avail_govs" == *"$governor"* ]]
@@ -135,58 +101,51 @@ do
 			break
 		fi
 	done
-		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/up_rate_limit_us 20000
-		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/down_rate_limit_us 20000
+		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/up_rate_limit_us 10000
+		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/down_rate_limit_us 15000
 		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/up_rate_limit_us 10000
-		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/down_rate_limit_us 20000
+		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/down_rate_limit_us 15000
 		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/up_rate_limit_us 10000
-		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/down_rate_limit_us 20000
-		ctl "${CPU}schedutil/rate_limit_us" 20000
+		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/down_rate_limit_us 15000
+		ctl "${CPU}schedutil/rate_limit_us" 15000
 		ctl "${CPU}schedutil/hispeed_load" 90
 		ctl "${CPU}schedutil/hispeed_freq" 0
 		ctl "${CPU}schedutil/pl" 1
 		ctl "${CPU}schedutil/iowait_boost_enable" 1
 done
 	
-	ctl $VM/vfs_cache_pressure 200
-	ctl $VM/dirty_background_ratio 3
-	ctl $VM/dirty_ratio 30
+	ctl $VM/vfs_cache_pressure 50
+	ctl $VM/dirty_background_ratio 5
+	ctl $VM/dirty_ratio 10 
 	ctl $VM/dirty_expire_centisecs 3000
-	ctl $VM/dirty_writeback_centisecs 3000
-	ctl $VM/swappiness 50
+	ctl $VM/dirty_writeback_centisecs 0
 	
 	#TOP-APP
-	ctl $ST_TOP/schedtune.boost 1
+	ctl $ST_TOP/schedtune.boost 0
 	ctl $ST_TOP/schedtune.prefer_idle 1
+	ctl $ST_FORE/schedtune.prefer_idle 1
 	
-	kmsg "-------------------------------------------------------------------------------------------------------------
-        $(date): LATENCY MODE ACTIVATED --
--------------------------------------------------------------------------------------------------------------------"
-	# Sucess Message
-	kmsg "LAZY HAS EXECUTED TASK SUCCESSFULLY. ENJOY!"
 	}
-	throughput_start() {        	
-kmsg "-------------------------------------------------------------------------------------------------------------
-         THROUGHPUT MODE IS STARTING --
--------------------------------------------------------------------------------------------------------------------"
+	
+throughput_start() {        	
 
 # Kernel
 if [ -d $KERNEL ]; then
 ctl $KERNEL/perf_cpu_time_max_percent 25
-ctl $KERNEL/sched_min_task_util_for_boost_colocation 1000
+ctl $KERNEL/sched_min_task_util_for_boost_colocation 15
 ctl $KERNEL/sched_autogroup_enabled 0
 ctl $KERNEL/sched_child_runs_first 0
 ctl $KERNEL/sched_latency_ns 10000000
 ctl $KERNEL/sched_min_granularity_ns 1000000
 ctl $KERNEL/sched_wakeup_granularity_ns 5000000
 ctl $KERNEL/sched_rt_runtime_us -1
-ctl $KERNEL/sched_initial_task_util 1000
+ctl $KERNEL/sched_initial_task_util 15
 fi
 	for queue in /sys/block/*/queue/
 	do
-	# hybrid schedulers priority
+	# skip kyber and mq-deadline
 	avail_scheds=`cat "${queue}scheduler"`
-	for sched in maple zen anxiety cfq bfq-mq mq-deadline
+	for sched in none
 	do
 		if [[ "$avail_scheds" == *"$sched"* ]]
 		then
@@ -194,20 +153,6 @@ fi
 			break
 		fi
 	done
-	ctl "${queue}iosched/back_seek_penalty" 1
-	ctl "${queue}iosched/slice_idle" 0
-	ctl "${queue}iosched/fifo_expire_sync" 330
-	ctl "${queue}iosched/fifo_expire_async" 80
-	ctl "${queue}iosched/slice_sync" 250
-	ctl "${queue}iosched/slice_async" 25
-	ctl "${queue}iosched/low_latency" 1
-	ctl "${queue}iosched/group_idle" 0
-	ctl "${queue}iosched/back_seek_penalty" 1
-	ctl "${queue}iosched/quantum" 8
-	ctl "${queue}iosched/slice_async_rq" 1
-	ctl "${queue}iosched/back_seek_max" 2147483647
-	ctl "${queue}nr_requests" 32
-	ctl "${queue}read_ahead_kb" 128
 	done
 	
 	for _ in $(seq 2)
@@ -222,30 +167,18 @@ fi
 	done
 	
 #GPU Tunables     	
-ctl /sys/class/kgsl/kgsl-3d0/idle_timer 1000000
-ctl /sys/class/kgsl/kgsl-3d0/force_clk_on 1
-ctl /sys/class/kgsl/kgsl-3d0/force_bus_on 1
-ctl /sys/class/kgsl/kgsl-3d0/force_no_nap 1
+ctl /sys/class/kgsl/kgsl-3d0/idle_timer 10000000
 ctl /sys/class/kgsl/kgsl-3d0/devfreq/adrenoboost 3
-ctl /sys/class/kgsl/kgsl-3d0/force_rail_on 1
-ctl /sys/class/kgsl/kgsl-3d0/bus_split 0
 ctl /sys/class/kgsl/kgsl-3d0/throttling 0
-
-if [ -e "/sys/module/adreno_idler" ]; then
-	ctl /sys/module/adreno_idler/parameters/adreno_idler_active "N"
-	ctl /sys/module/adreno_idler/parameters/adreno_idler_idleworkload "1000"
-	ctl /sys/module/adreno_idler/parameters/adreno_idler_downdifferential '50'
-	ctl /sys/module/adreno_idler/parameters/adreno_idler_idlewait '50'
-fi
 	
-# Loop over each CPU in the system
+# tune governor
 for cpu in /sys/devices/system/cpu/cpu*/cpufreq
 do
 	# Fetch the available governors from the CPU
 	avail_govs="$(cat "$cpu/scaling_available_governors")"
 
 	# Attempt to set the governor in this order
-	for governor in performance schedutil_pixel blu_schedutil schedutil
+	for governor in performance
 	do
 		# Once a matching governor is found, set it and break for this CPU
 		if [[ "$avail_govs" == *"$governor"* ]]
@@ -254,36 +187,18 @@ do
 			break
 		fi
 	done
-		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/up_rate_limit_us 20000
-		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/down_rate_limit_us 20000
-		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/up_rate_limit_us 10000
-		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/down_rate_limit_us 20000
-		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/up_rate_limit_us 10000
-		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/down_rate_limit_us 20000
-		ctl "${CPU}schedutil/rate_limit_us" 10000
-		ctl "${CPU}schedutil/hispeed_load" 90
-		ctl "${CPU}schedutil/hispeed_freq" 0
-		ctl "${CPU}schedutil/pl" 1
-		ctl "${CPU}schedutil/iowait_boost_enable" 1
 done
 	
 	ctl $VM/vfs_cache_pressure 500
 	ctl $VM/dirty_background_ratio 10
 	ctl $VM/dirty_ratio 50
 	ctl $VM/dirty_expire_centisecs 3000
-	ctl $VM/dirty_writeback_centisecs 3000
-	ctl $VM/swappiness 100
+	ctl $VM/dirty_writeback_centisecs 0
 	
 	#TOP-APP
 	ctl $ST_TOP/schedtune.boost 25
 	ctl $ST_TOP/schedtune.prefer_idle 0
-	
-	kmsg "-------------------------------------------------------------------------------------------------------------
-        $(date): THROUGHPUT MODE ACTIVATED --
--------------------------------------------------------------------------------------------------------------------"
-	# Sucess Message
-	kmsg "LAZY HAS EXECUTED TASK SUCCESSFULLY. ENJOY!"
-	# Sucess Message
+	ctl $ST_FORE/schedtune.prefer_idle 0
 	}
 (
 while true; do
