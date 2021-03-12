@@ -107,6 +107,7 @@ ps_ret="$(ps -Ao pid,args)"
 for temp_pid in $(echo "$ps_ret" | grep "$1" | awk '{print $1}'); do
 for temp_tid in $(ls "/proc/$temp_pid/task/"); do
 echo "$temp_tid" > "/dev/$3/$2/tasks"
+echo "-1000" > "/proc/$temp_tid/oom_score_adj"
 done
 done
 }
@@ -161,8 +162,6 @@ rm $LOG
 # fix laggy bilibili feed scrolling
 change_task_cgroup "servicemanager" "top-app" "cpuset"
 change_task_cgroup "servicemanager" "foreground" "stune"
-change_task_cgroup "crtc_commit" "top-app" "cpuset"
-change_task_cgroup "crtc_commit" "foreground" "stune"
 # fix laggy home gesture
 change_task_cgroup "system_server" "top-app" "cpuset"
 change_task_cgroup "system_server" "foreground" "stune"
@@ -171,7 +170,7 @@ kmsg "=======================================================================
 
 # reduce render thread waiting time
 change_task_cgroup "surfaceflinger" "top-app" "cpuset"
-change_task_cgroup "surfaceflinger" "foreground" "stune"
+change_task_cgroup "surfaceflinger" "top-app" "stune"
 kmsg "=======================================================================
          TASK OPTIMIZED"
 
@@ -181,6 +180,9 @@ change_task_affinity "kswapd0" "7f"
 change_task_affinity "oom_reaper" "7f"
 change_task_cgroup "kswapd" "background" "cpuset"
 change_task_cgroup "oom_reaper" "background" "cpuset"
+change_task_affinity "surfaceflinger" "ff"
+change_task_ionice "surfaceflinger" "7"
+change_task_ionice "composer" "7"
 kmsg "=======================================================================
          RENDERING UNLOCKED"
 # changing priority of system services for less aggressive google services and better services management
@@ -190,7 +192,7 @@ change_task_nice "deletescape" "-6"
 change_task_nice "trebuchet" "-6"
 change_task_nice "fluid" "-9"
 change_task_nice "composer" "-20"
-change_task_nice "kswapd0" "-2"
+change_task_nice "kswapd0" "1"
 change_task_nice "surfaceflinger" "-20"
 change_task_nice "servicemanager" "-6"
 change_task_nice "msm_irqbalance" "-5"

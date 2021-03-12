@@ -1,0 +1,140 @@
+
+#------------------------------------===#
+#VARIABLES------------------------------=#
+LOG=/sdcard/Android/lazy.log
+LPM="/sys/module/lpm_levels/parameters"
+LMK="/sys/module/lowmemorykiller/parameters"
+ST_TOP="/dev/stune/top-app"
+ST_FORE="/dev/stune/foreground"
+ST_BACK="/dev/stune/background"
+ST_RT="/dev/stune/rt"
+ST_GLOBAL="/dev/stune/"
+CSET="/dev/cpuset"
+VM="/proc/sys/vm"
+FS="/proc/sys/fs"
+NET="/proc/sys/net"
+KERNEL="/proc/sys/kernel"
+DBG="/sys/kernel/debug"
+#------------------------------------===#
+#------------------------------------===#
+
+# Log in white and continue (unnecessary)
+kmsg() {
+	echo -e "[-] $@" >> $LOG
+	echo -e "[-] $@"
+}
+
+ctl() {
+	# Bail out if file does not exist
+	[[ ! -f "$1" ]] && return 1
+
+	# Fetch the current key value
+	local curval=`cat "$1" 2> /dev/null`
+	
+	# Bail out if value is already set
+	[[ "$curval" == "$2" ]] && return 1
+	
+	# Make file writable in case it is not already
+	chmod 777 "$1" 2> /dev/null
+
+	# Write the new value and bail if there's an error
+	if ! echo "$2" > "$1" 2> /dev/null
+	then
+		return 1
+	fi
+
+	# Log the success
+	kmsg "$1 $curval -> $2"
+}
+kmsg "-------------------------------------------------------------------------------------------------------------
+         CONSERVATIVE MODE IS STARTING --
+-------------------------------------------------------------------------------------------------------------------"
+
+# Kernel
+if [ -d $KERNEL ]; then
+ctl $KERNEL/perf_cpu_time_max_percent 25
+ctl $KERNEL/sched_min_task_util_for_boost_colocation 15
+ctl $KERNEL/sched_autogroup_enabled 0
+ctl $KERNEL/sched_child_runs_first 0
+ctl $KERNEL/sched_latency_ns 10000000
+ctl $KERNEL/sched_min_granularity_ns 1000000
+ctl $KERNEL/sched_wakeup_granularity_ns 5000000
+ctl $KERNEL/sched_rt_runtime_us 955000
+ctl $KERNEL/sched_initial_task_util 15
+fi
+	for queue in /sys/block/*/queue/
+	do
+	# skip kyber and mq-deadline
+	avail_scheds=`cat "${queue}scheduler"`
+	for sched in none
+	do
+		if [[ "$avail_scheds" == *"$sched"* ]]
+		then
+			ctl "${queue}scheduler" "$sched"
+			break
+		fi
+	done
+	done
+	
+	for _ in $(seq 2)
+	do
+	# Migrate tasks down at this much load
+	ctl $KERNEL/sched_downmigrate 90
+	ctl $KERNEL/sched_group_downmigrate 90
+	
+	# Migrate tasks up at this much load
+	ctl $KERNEL/sched_upmigrate 100
+	ctl $KERNEL/sched_group_upmigrate 100
+	done
+	
+#GPU Tunables     	
+ctl /sys/class/kgsl/kgsl-3d0/idle_timer 58
+ctl /sys/class/kgsl/kgsl-3d0/devfreq/adrenoboost 0
+ctl /sys/class/kgsl/kgsl-3d0/throttling 1
+	
+# tune governor
+for cpu in /sys/devices/system/cpu/cpu*/cpufreq
+do
+	# Fetch the available governors from the CPU
+	avail_govs="$(cat "$cpu/scaling_available_governors")"
+
+	# Attempt to set the governor in this order
+	for governor in blu_schedutil schedutil interactive
+	do
+		# Once a matching governor is found, set it and break for this CPU
+		if [[ "$avail_govs" == *"$governor"* ]]
+		then
+			ctl "$cpu/scaling_governor" "$governor"
+			break
+		fi
+	done
+		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/up_rate_limit_us 4500
+		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/down_rate_limit_us 200
+		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/up_rate_limit_us 4500
+		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/down_rate_limit_us 200
+		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/up_rate_limit_us 4500
+		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/down_rate_limit_us 200
+		ctl "${CPU}schedutil/rate_limit_us" 4500
+		ctl "${CPU}schedutil/hispeed_load" 90
+		ctl "${CPU}schedutil/hispeed_freq" 0
+		ctl "${CPU}schedutil/pl" 0
+		ctl "${CPU}schedutil/iowait_boost_enable" 0
+done
+	
+	ctl $VM/vfs_cache_pressure 50
+	ctl $VM/dirty_background_ratio 10
+	ctl $VM/dirty_ratio 20
+	ctl $VM/dirty_expire_centisecs 3000
+	ctl $VM/dirty_writeback_centisecs 3000
+	
+	#TOP-APP
+	ctl $ST_TOP/schedtune.boost 0
+	ctl $ST_TOP/schedtune.prefer_idle 0
+	ctl $ST_FORE/schedtune.prefer_idle 0
+	
+	kmsg "-------------------------------------------------------------------------------------------------------------
+        $(date): CONSERVATIVE MODE ACTIVE --
+-------------------------------------------------------------------------------------------------------------------"
+	# Sucess Message
+	kmsg "LAZY HAS EXECUTED TASK SUCCESSFULLY. ENJOY!"
+	

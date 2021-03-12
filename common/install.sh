@@ -50,10 +50,11 @@ ui_print " [1] X Reality Engine Kcal™ - brighter,warmer, vivid"
 ui_print " [2] Harley Tech Kcal™ - darker, vivid, cooler, more screen details"
 ui_print " [3] Vivid Screen Retention Fix - common retention fix preset, but more vivid"
 ui_print " [4] Obsanity™ - Warm Harley Tech preset"
-ui_print " [5] Deep Colorful Black - Amoled like dark preset "
-ui_print " [6] Triluminos Display - Sony  "
-ui_print " [7] Fake AMOLED - Amoled wannabe  "
-ui_print " [8] No "
+ui_print " [5] Deep Colorful Black - Amoled like dark preset"
+ui_print " [6] Triluminos Display - Sony "
+ui_print " [7] Fake AMOLED - Amoled wannabe "
+ui_print " [8] Deep Black and White"
+ui_print " [9] No "
 ui_print " [NOTE]- you can reinstall and skip this option if problem persists. "
 	while true; do
 	ui_print "  $kcal"
@@ -104,9 +105,9 @@ ui_print "   "
 ui_print "- Do you want to install lazy kernel optimizer?"
 ui_print "---------------------------------------------------"
 ui_print "-                                                 -"
-ui_print "-  	       Lazy is a Kernel Optimizer 	      -"
-ui_print "-      Provides performance, battery, latency     -"
-ui_print "-            based on your preferences.	      -"
+ui_print "-  		 Lazy is a Kernel Optimizer 		   -"
+ui_print "-        Provides performance, battery, latency   -"
+ui_print "-         based on your preferences.	          -"
 ui_print "---------------------------------------------------"
 ui_print "  Vol+ = Next; Vol- = Select "
 ui_print " [1] Yes"
@@ -126,11 +127,44 @@ done
 ui_print "  Selected: [$lazy] "
 fi
 
+if [ $lazy -eq 1 ]; then
+def=1
+if [ $def -ne 0 ]; then
+ui_print "   "
+ui_print " "
+ui_print "---------------------------------------------------"
+ui_print "-                                                 -"
+ui_print "-  		 DEFAULT LAZY MODE SELECT   		   -"
+ui_print "-        please select your default mode          -"
+ui_print "-  this will be your default mode after booting.  -"
+ui_print "---------------------------------------------------"
+ui_print "  Vol+ = Next; Vol- = Select "
+ui_print " [1] Auto "
+ui_print " [2] Conservative"
+ui_print " [3] Balanced"
+ui_print " [4] Latency"
+ui_print " [5] Throughput"
+ui_print " [6] Skip"
+ui_print " [NOTE]- you can reinstall and skip this option if problem persists. "
+	while true; do
+	ui_print "  $def"
+	if $VKSEL; then
+		def=$((def + 1))
+	else
+		break
+	fi
+	if [ $def -gt 6 ]; then
+		def=1
+	fi
+done
+ui_print "  Selected: [$def] "
+fi
+fi
 #
 
 case $w in
-	1 ) sed -i "83i ctl /sys/kernel/debug/sched_features HRTICK" /data/adb/modules_update/toolbox8/scripts/lazy;;
-	2 ) ui_print " skipped";;
+	1 ) sed -i "89i ctl /sys/kernel/debug/sched_features HRTICK" /data/adb/modules_update/toolbox8/scripts/lazy;;
+	2 ) ui_print " HRTICK feature skipped";;
 esac
 
 case $kcal in
@@ -179,7 +213,15 @@ echo '0' > /sys/devices/platform/kcal_ctrl.0/kcal_hue
 echo '35' > /sys/devices/platform/kcal_ctrl.0/kcal_min
 echo '277' > /sys/devices/platform/kcal_ctrl.0/kcal_sat
 echo '250' > /sys/devices/platform/kcal_ctrl.0/kcal_val" >> /data/adb/modules_update/toolbox8/scripts/kcal; l3=$(cat $MODPATH/scripts/kcal); echo "$l3" >> /data/adb/modules_update/toolbox8/system/bin/pandora;;
-	8 ) rm -rf /data/adb/modules_update/toolbox8/scripts/kcal;;
+	8 ) echo "echo '1' > /sys/devices/platform/kcal ctrl.0/kcal_enable
+echo '0' > /sys/devices/platform/kcal_ctrl.0/kcal_invert 
+echo '35' > /sys/devices/platform/kcal ctrl.0/kcalmin 
+echo '250 250 256' > /sys/devices/platform/kcal_ctrl.0/kcal 
+echo '279' > /sys/devices/platform/kcal_ctrl.0/kcal_sat 
+echo '1526' > /sys/devices/platform/kcal_ctrl.0/kcal_hue 
+echo '261' > /sys/devices/platform/kcal_ctrl.0/kcal_val 
+echo '266' > /sys/devices/platform/kcal_ctrl.0/kcal_cont"  >> /data/adb/modules_update/toolbox8/scripts/kcal; l3=$(cat $MODPATH/scripts/kcal); echo "$l3" >> /data/adb/modules_update/toolbox8/system/bin/pandora;;
+	9 ) rm -rf /data/adb/modules_update/toolbox8/scripts/kcal;;
 esac
 
 case $swift in
@@ -187,9 +229,18 @@ case $swift in
 	2 ) rm -rf /data/adb/modules_update/toolbox8/scripts/swift; rm -rf /data/adb/modules_update/toolbox8/system/bin/adjshield; rm -rf /data/adb/modules_update/toolbox8/system/bin/fscache-ctrl;;
 esac
 
+case $def in
+	1 ) sed -i "265i setprop persist.lazy.mode 1" /data/adb/modules_update/toolbox8/scripts/lazy;;
+	2 ) sed -i "265i setprop persist.lazy.mode 2" /data/adb/modules_update/toolbox8/scripts/lazy;;
+	3 ) sed -i "265i setprop persist.lazy.mode 3" /data/adb/modules_update/toolbox8/scripts/lazy;;
+	4 ) sed -i "265i setprop persist.lazy.mode 4" /data/adb/modules_update/toolbox8/scripts/lazy;;
+	5 ) sed -i "265i setprop persist.lazy.mode 5" /data/adb/modules_update/toolbox8/scripts/lazy;;
+	6 ) ui_print "Lazy is not installed."
+esac
+
 case $lazy in
 	1 ) l1=$(cat $MODPATH/scripts/lazy); echo "$l1" >> /data/adb/modules_update/toolbox8/system/bin/pandora;;
-	2 ) rm -rf /data/adb/modules_update/toolbox8/scripts/lazy;;
+	2 ) rm -rf /data/adb/modules_update/toolbox8/scripts/lazy; rm -rf /data/adb/modules_update/toolbox8/system/bin/auto; rm -rf /data/adb/modules_update/toolbox8/system/bin/lat; rm -rf /data/adb/modules_update/toolbox8/system/bin/bal; rm -rf /data/adb/modules_update/toolbox8/system/bin/through; rm -rf /data/adb/modules_update/toolbox8/system/bin/cons; rm -rf $MODPATH/base.apk; rm -rf $MODPATH/toast.apk; ui_print "You have skipped lazy's installation..";;
 esac
 
 
