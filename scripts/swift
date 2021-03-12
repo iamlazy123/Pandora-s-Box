@@ -94,92 +94,314 @@ adjshield_status()
     fi
 }
 
-# Cgroup functions
-# $1:task_name $2:cgroup_name $3:"cpuset"/"stune"
+#CGROUP functions
 change_task_cgroup()
 {
-# avoid matching grep itself
-# ps -Ao pid,args | grep kswapd
-# 150 [kswapd0]
-# 16490 grep kswapd
-local ps_ret
-ps_ret="$(ps -Ao pid,args)"
-for temp_pid in $(echo "$ps_ret" | grep "$1" | awk '{print $1}'); do
-for temp_tid in $(ls "/proc/$temp_pid/task/"); do
-echo "$temp_tid" > "/dev/$3/$2/tasks"
-echo "-1000" > "/proc/$temp_tid/oom_score_adj"
-done
-done
+    local ps_ret
+    ps_ret="$(ps -Ao pid,args)"
+    for temp_pid in $(echo "$ps_ret" | grep -i "$1" | awk '{print $1}'); do
+        for temp_tid in $(ls "/proc/$temp_pid/task/"); do
+            comm="$(cat /proc/$temp_pid/task/$temp_tid/comm)"
+            log "change $1/$comm($temp_tid) -> cgroup:$2"
+            echo "$temp_tid" > "/dev/$3/$2/tasks"
+        done
+    done
 }
 
-# $1:task_name $2:nice(relative to 120)
-change_task_nice()
+# $1:process_name $2:cgroup_name $3:"cpuset"/"stune"
+change_proc_cgroup()
 {
-# avoid matching grep itself
-# ps -Ao pid,args | grep kswapd
-# 150 [kswapd0]
-# 16490 grep kswapd
-local ps_ret
-ps_ret="$(ps -Ao pid,args)"
-for temp_pid in $(echo "$ps_ret" | grep "$1" | awk '{print $1}'); do
-for temp_tid in $(ls "/proc/$temp_pid/task/"); do
-renice -n "$2" -p "$temp_tid"
-done
-done
+    local ps_ret
+    ps_ret="$(ps -Ao pid,args)"
+    for temp_pid in $(echo "$ps_ret" | grep -i "$1" | awk '{print $1}'); do
+        comm="$(cat /proc/$temp_pid/comm)"
+        log "change $comm($temp_pid) -> cgroup:$2"
+        echo $temp_pid > "/dev/$3/$2/cgroup.procs"
+    done
 }
-# $1:task_name $2:nice(relative to 120)
-change_task_ionice()
+
+# $1:task_name $2:thread_name $3:cgroup_name $4:"cpuset"/"stune"
+change_thread_cgroup()
 {
-# avoid matching grep itself
-# ps -Ao pid,args | grep kswapd
-# 150 [kswapd0]
-# 16490 grep kswapd
-local ps_ret
-ps_ret="$(ps -Ao pid,args)"
-for temp_pid in $(echo "$ps_ret" | grep "$1" | awk '{print $1}'); do
-for temp_tid in $(ls "/proc/$temp_pid/task/"); do
-ionice -c 2 -n "$2" -p "$temp_tid"
-done
-done
+    local ps_ret
+    ps_ret="$(ps -Ao pid,args)"
+    for temp_pid in $(echo "$ps_ret" | grep -i "$1" | awk '{print $1}'); do
+        for temp_tid in $(ls "/proc/$temp_pid/task/"); do
+            comm="$(cat /proc/$temp_pid/task/$temp_tid/comm)"
+            if [ "$(echo $comm | grep -i "$2")" != "" ]; then
+                log "change $1/$comm($temp_tid) -> cgroup:$3"
+                echo "$temp_tid" > "/dev/$4/$3/tasks"
+            fi
+        done
+    done
 }
 
 # $1:task_name $2:hex_mask(0x00000003 is CPU0 and CPU1)
 change_task_affinity()
 {
-# avoid matching grep itself
-# ps -Ao pid,args | grep kswapd
-# 150 [kswapd0]
-# 16490 grep kswapd
-local ps_ret
-ps_ret="$(ps -Ao pid,args)"
-for temp_pid in $(echo "$ps_ret" | grep "$1" | awk '{print $1}'); do
-for temp_tid in $(ls "/proc/$temp_pid/task/"); do
-taskset -p "$2" "$temp_tid"
-done
-done
+    local ps_ret
+    ps_ret="$(ps -Ao pid,args)"
+    for temp_pid in $(echo "$ps_ret" | grep -i "$1" | awk '{print $1}'); do
+        for temp_tid in $(ls "/proc/$temp_pid/task/"); do
+            comm="$(cat /proc/$temp_pid/task/$temp_tid/comm)"
+            log "change $1/$comm($temp_tid) -> mask:$2"
+            taskset -p "$2" "$temp_tid" >> $SLOG
+        done
+    done
 }
-rm $LOG
-# fix laggy bilibili feed scrolling
-change_task_cgroup "servicemanager" "top-app" "cpuset"
-change_task_cgroup "servicemanager" "foreground" "stune"
-# fix laggy home gesture
-change_task_cgroup "system_server" "top-app" "cpuset"
-change_task_cgroup "system_server" "foreground" "stune"
-kmsg "=======================================================================
-         UX OPTIMIZED"
 
-# reduce render thread waiting time
-change_task_cgroup "surfaceflinger" "top-app" "cpuset"
-change_task_cgroup "surfaceflinger" "top-app" "stune"
-kmsg "=======================================================================
-         TASK OPTIMIZED"
+# $1:task_name $2:thread_name $3:hex_mask(0x00000003 is CPU0 and CPU1)
+change_thread_affinity()
+{
+    local ps_ret
+    local comm
+    ps_ret="$(ps -Ao pid,args)"
+    for temp_pid in $(echo "$ps_ret" | grep -i "$1" | awk '{print $1}'); do
+        for temp_tid in $(ls "/proc/$temp_pid/task/"); do
+            comm="$(cat /proc/$temp_pid/task/$temp_tid/comm)"
+            if [ "$(echo $comm | grep -i "$2")" != "" ]; then
+                log "change $1/$comm($temp_tid) -> mask:$3"
+                taskset -p "$3" "$temp_tid" >> $SLOG
+            fi
+        done
+    done
+}
+
+# $1:task_name $2:nice(relative to 120)
+change_task_nice()
+{
+    local ps_ret
+    ps_ret="$(ps -Ao pid,args)"
+    for temp_pid in $(echo "$ps_ret" | grep -i "$1" | awk '{print $1}'); do
+        for temp_tid in $(ls "/proc/$temp_pid/task/"); do
+            renice "$2" -p "$temp_tid" >> $SLOG
+        done
+    done
+}
+
+# $1:task_name $2:priority(99-x, 1<=x<=99)
+change_task_rt()
+{
+    local ps_ret
+    ps_ret="$(ps -Ao pid,args)"
+    for temp_pid in $(echo "$ps_ret" | grep -i "$1" | awk '{print $1}'); do
+        for temp_tid in $(ls "/proc/$temp_pid/task/"); do
+            comm="$(cat /proc/$temp_pid/task/$temp_tid/comm)"
+            log "change $1/$comm($temp_tid) -> RT policy"
+            chrt -f -p "$2" "$temp_tid" >> $SLOG
+        done
+    done
+}
+
+# $1:task_name $2:thread_name $3:priority(99-x, 1<=x<=99)
+change_thread_rt()
+{
+    local ps_ret
+    local comm
+    ps_ret="$(ps -Ao pid,args)"
+    for temp_pid in $(echo "$ps_ret" | grep -i "$1" | awk '{print $1}'); do
+        for temp_tid in $(ls "/proc/$temp_pid/task/"); do
+            comm="$(cat /proc/$temp_pid/task/$temp_tid/comm)"
+            if [ "$(echo $comm | grep -i "$2")" != "" ]; then
+                log "change $1/$comm($temp_tid) -> RT policy"
+                chrt -f -p "$3" "$temp_tid" >> $SLOG
+            fi
+        done
+    done
+}
+
+# $1:task_name
+change_task_high_prio()
+{
+    local ps_ret
+    ps_ret="$(ps -Ao pid,args)"
+    for temp_pid in $(echo "$ps_ret" | grep -i "$1" | awk '{print $1}'); do
+        for temp_tid in $(ls "/proc/$temp_pid/task/"); do
+            # audio thread nice <= -16
+            comm="$(cat /proc/$temp_pid/task/$temp_tid/comm)"
+            log "change $1/$comm($temp_tid) -> Nice -15"
+            renice -n -15 -p "$temp_tid" >> $SLOG
+        done
+    done
+}
+
+# $1:task_name $2:thread_name
+change_thread_high_prio()
+{
+    local ps_ret
+    local comm
+    ps_ret="$(ps -Ao pid,args)"
+    for temp_pid in $(echo "$ps_ret" | grep -i "$1" | awk '{print $1}'); do
+        for temp_tid in $(ls "/proc/$temp_pid/task/"); do
+            comm="$(cat /proc/$temp_pid/task/$temp_tid/comm)"
+            if [ "$(echo $comm | grep -i "$2")" != "" ]; then
+                # audio thread nice <= -16
+                log "change $1/$comm($temp_tid) -> Nice -15"
+                renice -n -15 -p "$temp_tid" >> $SLOG
+            fi
+        done
+    done
+}
+
+# $1:task_name $2:thread_name
+unpin_thread()
+{
+    change_thread_cgroup "$1" "$2" "" "cpuset"
+}
+
+# $1:task_name $2:thread_name
+pin_thread_on_pwr()
+{
+    change_thread_cgroup "$1" "$2" "background" "cpuset"
+}
+
+# $1:task_name $2:thread_name
+pin_thread_on_mid()
+{
+    change_thread_cgroup "$1" "$2" "foreground" "cpuset"
+    change_thread_affinity "$1" "$2" "7f"
+}
+
+# $1:task_name $2:thread_name
+pin_thread_on_perf()
+{
+    unpin_thread "$1" "$2"
+    change_thread_affinity "$1" "$2" "f0"
+}
+
+# $1:task_name
+unpin_proc()
+{
+    change_task_cgroup "$1" "" "cpuset"
+}
+
+# $1:task_name
+pin_proc_on_pwr()
+{
+    change_task_cgroup "$1" "background" "cpuset"
+}
+
+# $1:task_name
+pin_proc_on_mid()
+{
+    change_task_cgroup "$1" "foreground" "cpuset"
+    change_task_affinity "$1" "7f"
+}
+
+# $1:task_name
+pin_proc_on_perf()
+{
+    unpin_proc "$1"
+    change_task_affinity "$1" "f0"
+}
+
+rm $LOG
+
+#codes from uperf by matt yang
+ # Reduce Perf Cluster Wakeup
+    # daemons
+    pin_proc_on_pwr "crtc_commit"
+    pin_proc_on_pwr "crtc_event"
+    pin_proc_on_pwr "ueventd"
+    pin_proc_on_pwr "netd"
+    pin_proc_on_pwr "mdnsd"
+    pin_proc_on_pwr "pdnsd"
+    pin_proc_on_pwr "qcrild"
+    pin_proc_on_pwr "daemon"
+    pin_proc_on_pwr "analytics"
+    # hardware services, eg. android.hardware.sensors@1.0-service
+    pin_proc_on_pwr "\.hardware\."
+    # pwr cluster has enough capacity for surfaceflinger
+    pin_proc_on_pwr "surfaceflinger"
+    # MediaProvider is background service
+    pin_proc_on_pwr "com\.android\.providers\.media"
+    pin_proc_on_pwr "android\.process\.media"
+    # com.miui.securitycenter & com.miui.securityadd
+    pin_proc_on_pwr "miui\.security"
+
+    # system_server blacklist
+    pin_proc_on_mid "system_server"
+    # input dispatcher
+    change_thread_high_prio "system_server" "input"
+    # transition animation
+    change_thread_rt "system_server" "android\.ui" "1"
+    change_thread_rt "system_server" "android\.display" "1"
+    # not important
+    pin_thread_on_pwr "system_server" "Miui"
+    pin_thread_on_pwr "system_server" "Connect"
+    pin_thread_on_pwr "system_server" "Network"
+    pin_thread_on_pwr "system_server" "Wifi"
+    pin_thread_on_pwr "system_server" "Async"
+    pin_thread_on_pwr "system_server" "backup"
+    pin_thread_on_pwr "system_server" "Greezer"
+    pin_thread_on_pwr "system_server" "TaskSnapshot"
+    pin_thread_on_pwr "system_server" "Oom"
+    pin_thread_on_pwr "system_server" "Sync"
+    pin_thread_on_pwr "system_server" "Observer"
+    pin_thread_on_pwr "system_server" "Power"
+    pin_thread_on_pwr "system_server" "Sensor"
+    pin_thread_on_pwr "system_server" "Thread-"
+    pin_thread_on_pwr "system_server" "pool-"
+    pin_thread_on_pwr "system_server" "Jit thread pool"
+    # pin_thread_on_pwr "system_server" "\.bg" # it blocks binders
+    # do not let GC thread block system_server
+    # pin_thread_on_mid "system_server" "HeapTaskDaemon"
+    # pin_thread_on_mid "system_server" "FinalizerDaemon"
+
+    # Render Pipeline
+    # speed up searching service binder
+    change_task_cgroup "servicemanag" "top-app" "cpuset"
+    # prevent display service from being preempted by normal tasks
+    change_task_rt "\.hardware\.display" "2"
+    change_task_rt "\.composer" "2"
+    # vendor.qti.hardware.perf@2.2-service blocks hardware.display.composer-service
+    # perf will automatically set self to prio=100
+    unpin_proc "\.hardware\.perf"
+    # fix laggy bilibili feed scrolling
+    change_task_cgroup "android\.phone" "foreground" "cpuset"
+    change_thread_cgroup "android\.phone" "Binder" "top-app" "cpuset"
+    # sometimes surfaceflinger has quite high load
+    change_thread_cgroup "surfaceflinger" "surfaceflinger" "top-app" "cpuset"
+    pin_thread_on_mid "surfaceflinger" "app"
+    # let UX related Binders run with top-app
+    change_thread_cgroup "surfaceflinger" "^Binder" "top-app" "cpuset"
+    change_thread_cgroup "system_server" "^Binder" "top-app" "cpuset"
+    change_thread_cgroup "\.hardware\.display" "^Binder" "top-app" "cpuset"
+    change_thread_cgroup "\.composer" "^Binder" "top-app" "cpuset"
+    # transition animation
+    change_thread_cgroup "system_server" "android\.anim" "top-app" "cpuset"
+
+    # Heavy Scene Boost
+    # camera service
+    unpin_proc "\.hardware\.camera\.provider"
+    # provide best performance for fingerprint service
+    unpin_proc "\.hardware\.biometrics\.fingerprint"
+    change_task_high_prio "\.hardware\.biometrics\.fingerprint"
+    # mfp-daemon: goodix in-screen fingerprint daemon
+    unpin_proc "mfp"
+    change_task_high_prio "mfp"
+    # boost app boot process, zygote--com.xxxx.xxx
+    unpin_proc "zygote"
+    change_task_high_prio "zygote"
+    # boost android process pool, usap--com.xxxx.xxx
+    unpin_proc "usap"
+    change_task_high_prio "usap"
+
+    # busybox fork from magiskd
+    pin_proc_on_mid "magiskd"
+    change_task_nice "magiskd" "10"
+    
+# pin kworker on little
+for f in $(find /sys/devices/virtual/workqueue "cpumask"); do
+    echo 0f > $f
+done
+
+# End of uperf codes from matt yang
 
 # kernel reclaim threads run on more power-efficient cores
 change_task_nice "oom_reaper" "-2"
 change_task_affinity "kswapd0" "7f"
 change_task_affinity "oom_reaper" "7f"
-change_task_cgroup "kswapd" "background" "cpuset"
-change_task_cgroup "oom_reaper" "background" "cpuset"
 change_task_ionice "surfaceflinger" "7"
 change_task_ionice "composer" "7"
 kmsg "=======================================================================
@@ -202,6 +424,8 @@ change_task_cgroup "$@" "top-app" "cpuset";
 change_task_cgroup "$@" "foreground" "stune"; 
 kmsg "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
          OPTIMIZING $@"' _ < $APPLIST
+
+# QTI mem opt
 ###############################
 # PATHs
 ###############################
