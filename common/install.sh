@@ -63,7 +63,7 @@ ui_print " [NOTE]- you can reinstall and skip this option if problem persists. "
 	else
 		break
 	fi
-	if [ $kcal -gt 8 ]; then
+	if [ $kcal -gt 9 ]; then
 		kcal=1
 	fi
 done

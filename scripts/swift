@@ -403,15 +403,6 @@ done
 kmsg "=======================================================================
          UPERF USERSPACE MODS by (matt yang) APPLIED...."
          
-# kernel reclaim threads run on more power-efficient cores
-change_task_nice "oom_reaper" "-2"
-change_task_affinity "kswapd0" "7f"
-change_task_affinity "oom_reaper" "7f"
-change_task_ionice "surfaceflinger" "7"
-change_task_ionice "composer" "7"
-kmsg "=======================================================================
-         PROCESSES' IONICE AND AFFINITIES CHANGED..."
-         
 # changing priority of system services for less aggressive google services and better services management
 change_task_nice "system_server" "-6"
 change_task_nice "launcher" "-6"

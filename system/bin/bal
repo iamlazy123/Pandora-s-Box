@@ -108,17 +108,17 @@ do
 			break
 		fi
 	done
-		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/up_rate_limit_us 5000
-		ctl /sys/devices/system/cpu/cpufreq/policy0/schedutil/down_rate_limit_us 5000
-		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/up_rate_limit_us 5000
-		ctl /sys/devices/system/cpu/cpufreq/policy4/schedutil/down_rate_limit_us 5000
-		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/up_rate_limit_us 5000
-		ctl /sys/devices/system/cpu/cpufreq/policy6/schedutil/down_rate_limit_us 5000
-		ctl "${CPU}schedutil/rate_limit_us" 15000
-		ctl "${CPU}schedutil/hispeed_load" 90
-		ctl "${CPU}schedutil/hispeed_freq" 0
-		ctl "${CPU}schedutil/pl" 1
-		ctl "${CPU}schedutil/iowait_boost_enable" 1
+		ctl /sys/devices/system/cpu/cpufreq/policy0/$governor/up_rate_limit_us 5000
+		ctl /sys/devices/system/cpu/cpufreq/policy0/$governor/down_rate_limit_us 5000
+		ctl /sys/devices/system/cpu/cpufreq/policy4/$governor/up_rate_limit_us 5000
+		ctl /sys/devices/system/cpu/cpufreq/policy4/$governor/down_rate_limit_us 5000
+		ctl /sys/devices/system/cpu/cpufreq/policy6/$governor/up_rate_limit_us 5000
+		ctl /sys/devices/system/cpu/cpufreq/policy6/$governor/down_rate_limit_us 5000
+		ctl "${CPU}$governor/rate_limit_us" 15000
+		ctl "${CPU}$governor/hispeed_load" 90
+		ctl "${CPU}$governor/hispeed_freq" 0
+		ctl "${CPU}$governor/pl" 1
+		ctl "${CPU}$governor/iowait_boost_enable" 1
 done
 	
 	ctl $VM/vfs_cache_pressure 500
