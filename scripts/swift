@@ -309,18 +309,18 @@ kmsg "=======================================================================
     pin_proc_on_pwr "netd"
     pin_proc_on_pwr "mdnsd"
     pin_proc_on_pwr "pdnsd"
-    pin_proc_on_pwr "qcrild"
-    pin_proc_on_pwr "daemon"
     pin_proc_on_pwr "analytics"
+    pin_proc_on_pwr "daemon"
+    change_task_affinity "android\.system\.suspend" "7f"
     # hardware services, eg. android.hardware.sensors@1.0-service
     pin_proc_on_pwr "\.hardware\."
     # pwr cluster has enough capacity for surfaceflinger
     pin_proc_on_pwr "surfaceflinger"
     # MediaProvider is background service
-    pin_proc_on_pwr "com\.android\.providers\.media"
     pin_proc_on_pwr "android\.process\.media"
     # com.miui.securitycenter & com.miui.securityadd
     pin_proc_on_pwr "miui\.security"
+    pin_proc_on_mid "com\.android\.providers\.media"
 
     # system_server blacklist
     pin_proc_on_mid "system_server"
@@ -343,6 +343,7 @@ kmsg "=======================================================================
     pin_thread_on_pwr "system_server" "Observer"
     pin_thread_on_pwr "system_server" "Power"
     pin_thread_on_pwr "system_server" "Sensor"
+    pin_thread_on_pwr "system_server" "batterystats"
     pin_thread_on_pwr "system_server" "Thread-"
     pin_thread_on_pwr "system_server" "pool-"
     pin_thread_on_pwr "system_server" "Jit thread pool"
@@ -369,20 +370,25 @@ kmsg "=======================================================================
     # let UX related Binders run with top-app
     change_thread_cgroup "surfaceflinger" "^Binder" "top-app" "cpuset"
     change_thread_cgroup "system_server" "^Binder" "top-app" "cpuset"
+    change_thread_cgroup "system_server" "^Binder" "top-app" "stune"
+    change_thread_cgroup "system_server" "^Binder" "top-app" "cpuctl"
     change_thread_cgroup "\.hardware\.display" "^Binder" "top-app" "cpuset"
     change_thread_cgroup "\.composer" "^Binder" "top-app" "cpuset"
     # transition animation
     change_thread_cgroup "system_server" "android\.anim" "top-app" "cpuset"
 
     # Heavy Scene Boost
-    # camera service
-    unpin_proc "\.hardware\.camera\.provider"
+    # camera & video recording
+    pin_proc_on_mid "\.hardware\.camera"
+    pin_proc_on_mid "^camera"
+    pin_proc_on_mid "\.hardware\.audio"
+    pin_proc_on_mid "^audio"
     # provide best performance for fingerprint service
-    unpin_proc "\.hardware\.biometrics\.fingerprint"
+    pin_proc_on_perf "\.hardware\.biometrics\.fingerprint"
     change_task_high_prio "\.hardware\.biometrics\.fingerprint"
     # mfp-daemon: goodix in-screen fingerprint daemon
-    unpin_proc "mfp"
-    change_task_high_prio "mfp"
+    pin_proc_on_perf "mfp-daemon"
+    change_task_high_prio "mfp-daemon"
     # boost app boot process, zygote--com.xxxx.xxx
     unpin_proc "zygote"
     change_task_high_prio "zygote"

@@ -59,7 +59,7 @@ fi
 	do
 	# skip kyber and mq-deadline
 	avail_scheds=`cat "${queue}scheduler"`
-	for sched in none
+	for sched in bfq-sq anxiety maple none
 	do
 		if [[ "$avail_scheds" == *"$sched"* ]]
 		then
@@ -67,17 +67,13 @@ fi
 			break
 		fi
 	done
-	done
-	
-	for _ in $(seq 2)
-	do
-	# Migrate tasks down at this much load
-	ctl $KERNEL/sched_downmigrate 75
-	ctl $KERNEL/sched_group_downmigrate 75
-	
-	# Migrate tasks up at this much load
-	ctl $KERNEL/sched_upmigrate 75
-	ctl $KERNEL/sched_group_upmigrate 75
+	ctl "${queue}iosched/back_seek_penalty" 1
+	ctl "${queue}iosched/slice_idle" 0
+	ctl "${queue}iosched/low_latency" 1
+	ctl "${queue}iosched/group_idle" 0
+	ctl "${queue}iosched/quantum" 16
+	ctl "${queue}iosched/slice_async_rq" 1
+	ctl "${queue}iosched/back_seek_max" 214748364
 	done
 	
 #GPU Tunables     	
@@ -114,11 +110,11 @@ do
 		ctl "${CPU}$governor/iowait_boost_enable" 1
 done
 	
-	ctl $VM/vfs_cache_pressure 50
-	ctl $VM/dirty_background_ratio 5
-	ctl $VM/dirty_ratio 10 
+	ctl $VM/vfs_cache_pressure 200
+	ctl $VM/dirty_background_ratio 3
+	ctl $VM/dirty_ratio 30
 	ctl $VM/dirty_expire_centisecs 3000
-	ctl $VM/dirty_writeback_centisecs 0
+	ctl $VM/dirty_writeback_centisecs 3000
 	
 	#TOP-APP
 	ctl $ST_TOP/schedtune.boost 0
@@ -145,7 +141,7 @@ fi
 	do
 	# skip kyber and mq-deadline
 	avail_scheds=`cat "${queue}scheduler"`
-	for sched in none
+	for sched in bfq-sq anxiety cfq none
 	do
 		if [[ "$avail_scheds" == *"$sched"* ]]
 		then
@@ -153,17 +149,6 @@ fi
 			break
 		fi
 	done
-	done
-	
-	for _ in $(seq 2)
-	do
-	# Migrate tasks down at this much load
-	ctl $KERNEL/sched_downmigrate 65
-	ctl $KERNEL/sched_group_downmigrate 65
-	
-	# Migrate tasks up at this much load
-	ctl $KERNEL/sched_upmigrate 75
-	ctl $KERNEL/sched_group_upmigrate 75
 	done
 	
 #GPU Tunables     	
@@ -178,7 +163,7 @@ do
 	avail_govs="$(cat "$cpu/scaling_available_governors")"
 
 	# Attempt to set the governor in this order
-	for governor in performance
+	for governor in schedutil interactive
 	do
 		# Once a matching governor is found, set it and break for this CPU
 		if [[ "$avail_govs" == *"$governor"* ]]
@@ -187,6 +172,17 @@ do
 			break
 		fi
 	done
+	    ctl /sys/devices/system/cpu/cpufreq/policy0/$governor/up_rate_limit_us 2000
+		ctl /sys/devices/system/cpu/cpufreq/policy0/$governor/down_rate_limit_us 2000
+		ctl /sys/devices/system/cpu/cpufreq/policy4/$governor/up_rate_limit_us 2000
+		ctl /sys/devices/system/cpu/cpufreq/policy4/$governor/down_rate_limit_us 2000
+		ctl /sys/devices/system/cpu/cpufreq/policy6/$governor/up_rate_limit_us 2000
+		ctl /sys/devices/system/cpu/cpufreq/policy6/$governor/down_rate_limit_us 2000
+		ctl "${CPU}$governor/rate_limit_us" 2000
+		ctl "${CPU}$governor/hispeed_load" 90
+		ctl "${CPU}$governor/hispeed_freq" 0
+		ctl "${CPU}$governor/pl" 1
+		ctl "${CPU}$governor/iowait_boost_enable" 1
 done
 	
 	ctl $VM/vfs_cache_pressure 500
@@ -196,7 +192,7 @@ done
 	ctl $VM/dirty_writeback_centisecs 0
 	
 	#TOP-APP
-	ctl $ST_TOP/schedtune.boost 25
+	ctl $ST_TOP/schedtune.boost 5
 	ctl $ST_TOP/schedtune.prefer_idle 0
 	ctl $ST_FORE/schedtune.prefer_idle 0
 	}

@@ -163,7 +163,7 @@ fi
 #
 
 case $w in
-	1 ) sed -i "89i ctl /sys/kernel/debug/sched_features HRTICK" /data/adb/modules_update/toolbox8/scripts/lazy;;
+	1 ) sed -i "110i ctl /sys/kernel/debug/sched_features HRTICK" /data/adb/modules_update/toolbox8/scripts/lazy;;
 	2 ) ui_print " HRTICK feature skipped";;
 esac
 
@@ -230,11 +230,11 @@ case $swift in
 esac
 
 case $def in
-	1 ) sed -i "292i setprop persist.lazy.mode 1" /data/adb/modules_update/toolbox8/scripts/lazy;;
-	2 ) sed -i "292i setprop persist.lazy.mode 2" /data/adb/modules_update/toolbox8/scripts/lazy;;
-	3 ) sed -i "292i setprop persist.lazy.mode 3" /data/adb/modules_update/toolbox8/scripts/lazy;;
-	4 ) sed -i "292i setprop persist.lazy.mode 4" /data/adb/modules_update/toolbox8/scripts/lazy;;
-	5 ) sed -i "292i setprop persist.lazy.mode 5" /data/adb/modules_update/toolbox8/scripts/lazy;;
+	1 ) sed -i "316i setprop persist.lazy.mode 1" /data/adb/modules_update/toolbox8/scripts/lazy;;
+	2 ) sed -i "316i setprop persist.lazy.mode 2" /data/adb/modules_update/toolbox8/scripts/lazy;;
+	3 ) sed -i "316i setprop persist.lazy.mode 3" /data/adb/modules_update/toolbox8/scripts/lazy;;
+	4 ) sed -i "316i setprop persist.lazy.mode 4" /data/adb/modules_update/toolbox8/scripts/lazy;;
+	5 ) sed -i "316i setprop persist.lazy.mode 5" /data/adb/modules_update/toolbox8/scripts/lazy;;
 	6 ) ui_print "Lazy is not installed."
 esac
 

@@ -66,7 +66,7 @@ fi
 	do
 	# skip kyber and mq-deadline
 	avail_scheds=`cat "${queue}scheduler"`
-	for sched in none
+	for sched in bfq-sq anxiety maple none
 	do
 		if [[ "$avail_scheds" == *"$sched"* ]]
 		then
@@ -74,17 +74,13 @@ fi
 			break
 		fi
 	done
-	done
-	
-	for _ in $(seq 2)
-	do
-	# Migrate tasks down at this much load
-	ctl $KERNEL/sched_downmigrate 90
-	ctl $KERNEL/sched_group_downmigrate 90
-	
-	# Migrate tasks up at this much load
-	ctl $KERNEL/sched_upmigrate 100
-	ctl $KERNEL/sched_group_upmigrate 100
+	ctl "${queue}iosched/back_seek_penalty" 1
+	ctl "${queue}iosched/slice_idle" 0
+	ctl "${queue}iosched/low_latency" 1
+	ctl "${queue}iosched/group_idle" 0
+	ctl "${queue}iosched/quantum" 16
+	ctl "${queue}iosched/slice_async_rq" 1
+	ctl "${queue}iosched/back_seek_max" 214748364
 	done
 	
 #GPU Tunables     	

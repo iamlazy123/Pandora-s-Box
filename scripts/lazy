@@ -52,6 +52,27 @@ ctl() {
 toast() {
  am start -a android.intent.action.MAIN -e toasttext "$cmode" -n bellavita.toast/.MainActivity
 }	
+set_sched_migrate()
+{
+    ctl $KERNEL/sched_downmigrate "$2"
+    ctl $KERNEL/sched_upmigrate "$1"
+    ctl $KERNEL/sched_downmigrate "$2"
+    ctl $KERNEL/sched_group_downmigrate "$4"
+    ctl $KERNEL/sched_group_upmigrate "$3"
+    ctl $KERNEL/sched_group_downmigrate "$4"
+}
+unify_lpm()
+{
+    # enter C-state level 3 took ~500us
+    ctl $LPM/sleep_disabled "0" 
+    ctl $LPM/lpm_ipi_prediction "0" 
+    if [ -f "$LPM/bias_hyst" ]; then
+        ctl $LPM/bias_hyst "1" 
+        ctl $LPM/lpm_prediction "0" 
+    else
+        ctl $LPM/lpm_prediction "1" 
+    fi
+}
 # Check for root permissions and bail if not granted
 if [[ "$(id -u)" -ne 0 ]]
 then
@@ -76,7 +97,7 @@ settings put global storage_benchmark_interval 9223372036854775807 # effectively
 # Scheduler features 
 if [[ -f "$DBG/sched_features" ]]
 then
-	ctl $DBG/sched_features NO_TTWU_QUEUE
+	ctl $DBG/sched_features TTWU_QUEUE
 	ctl $DBG/sched_features NEXT_BUDDY
 	ctl $DBG/sched_features NO_GENTLE_FAIR_SLEEPERS
 	ctl $DBG/sched_features NO_LB_BIAS
@@ -85,7 +106,7 @@ then
 	ctl $DBG/sched_features NO_NONTASK_CAPACITY
 	ctl $DBG/sched_features NO_EAS_USE_NEED_IDLE
 	ctl $DBG/sched_features NO_RT_RUNTIME_SHARE
-	ctl $DBG/sched_features SCHEDTUNE_BOOST_UTIL
+	ctl $DBG/sched_features NO_SCHEDTUNE_BOOST_UTIL
 	
 fi
 
@@ -195,7 +216,7 @@ ctl /sys/kernel/fast_charge/force_fast_charge 1
 
 sysctl -w kernel.sched_util_clamp_min_rt_default=96
 sysctl -w kernel.sched_util_clamp_min=128
-
+sysctl -w kernel.sched_util_clamp_max=1024
 #top-app
 ctl /dev/cpuset/top-app/uclamp.max max
 ctl /dev/cpuset/top-app/uclamp.min 10
@@ -219,7 +240,12 @@ ctl /dev/cpuset/system-background/uclamp.max 40
 ctl /dev/cpuset/system-background/uclamp.min 0
 ctl /dev/cpuset/system-background/uclamp.boosted 0
 ctl /dev/cpuset/system-background/uclamp.latency_sensitive 0
-	
+
+set_sched_migrate "50" "25" "999" "888"
+set_sched_migrate "50 90" "25 50" "999" "888"
+
+unify_lpm
+
 kmsg "-------------------------------------------------------------------------------------------------------------
         CPU OPTIMIZED
 -------------------------------------------------------------------------------------------------------------------"
@@ -228,15 +254,8 @@ kmsg "--------------------------------------------------------------------------
 	do
 	ctl "${queue}iostats" 0
 	ctl "${queue}add_random" 0
-	ctl "${queue}nr_requests" 32
-	ctl "${queue}read_ahead_kb" 32
-	ctl "${queue}iosched/back_seek_penalty" 1
-	ctl "${queue}iosched/slice_idle" 0
-	ctl "${queue}iosched/low_latency" 1
-	ctl "${queue}iosched/group_idle" 0
-	ctl "${queue}iosched/quantum" 16
-	ctl "${queue}iosched/slice_async_rq" 1
-	ctl "${queue}iosched/back_seek_max" 214748364
+	ctl "${queue}nr_requests" 64
+	ctl "${queue}read_ahead_kb" 64
 	done
 	
 	for queue in /sys/block/mmc*/queue/
@@ -258,6 +277,11 @@ kmsg "--------------------------------------------------------------------------
 	ctl "${queue}rq_affinity" 2
 	ctl "${queue}rotational" 0
 	ctl "${queue}nomerges" 1
+	done
+	
+	for queue in /sys/block/loop*/queue/
+	do
+	ctl "${queue}rotational" 0
 	done
 	
 kmsg "-------------------------------------------------------------------------------------------------------------
