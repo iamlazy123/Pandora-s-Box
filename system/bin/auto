@@ -192,7 +192,7 @@ done
 	ctl $VM/dirty_writeback_centisecs 0
 	
 	#TOP-APP
-	ctl $ST_TOP/schedtune.boost 5
+	ctl $ST_TOP/schedtune.boost 1
 	ctl $ST_TOP/schedtune.prefer_idle 0
 	ctl $ST_FORE/schedtune.prefer_idle 0
 	}
