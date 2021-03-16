@@ -254,8 +254,8 @@ kmsg "--------------------------------------------------------------------------
 	do
 	ctl "${queue}iostats" 0
 	ctl "${queue}add_random" 0
-	ctl "${queue}nr_requests" 32
-	ctl "${queue}read_ahead_kb" 32
+	ctl "${queue}nr_requests" 128
+	ctl "${queue}read_ahead_kb" 128
 	done
 	
 	for queue in /sys/block/mmc*/queue/
