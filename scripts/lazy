@@ -64,11 +64,11 @@ set_sched_migrate()
 unify_lpm()
 {
     # enter C-state level 3 took ~500us
-    ctl $LPM/sleep_disabled "0" 
-    ctl $LPM/lpm_ipi_prediction "0" 
+    ctl $LPM/sleep_disabled "N" 
+    ctl $LPM/lpm_ipi_prediction "N" 
     if [ -f "$LPM/bias_hyst" ]; then
         ctl $LPM/bias_hyst "1" 
-        ctl $LPM/lpm_prediction "0" 
+        ctl $LPM/lpm_prediction "N" 
     else
         ctl $LPM/lpm_prediction "1" 
     fi
@@ -254,29 +254,29 @@ kmsg "--------------------------------------------------------------------------
 	do
 	ctl "${queue}iostats" 0
 	ctl "${queue}add_random" 0
-	ctl "${queue}nr_requests" 64
-	ctl "${queue}read_ahead_kb" 64
+	ctl "${queue}nr_requests" 32
+	ctl "${queue}read_ahead_kb" 32
 	done
 	
 	for queue in /sys/block/mmc*/queue/
 	do
 	ctl "${queue}rq_affinity" 2
 	ctl "${queue}rotational" 0
-	ctl "${queue}nomerges" 1
+	ctl "${queue}nomerges" 0
 	done
 	
 	for queue in /sys/block/s*/queue/
 	do
 	ctl "${queue}rq_affinity" 2
 	ctl "${queue}rotational" 0
-	ctl "${queue}nomerges" 1
+	ctl "${queue}nomerges" 0
 	done
 	
 	for queue in /sys/block/d*/queue/
 	do
 	ctl "${queue}rq_affinity" 2
 	ctl "${queue}rotational" 0
-	ctl "${queue}nomerges" 1
+	ctl "${queue}nomerges" 0
 	done
 	
 	for queue in /sys/block/loop*/queue/
