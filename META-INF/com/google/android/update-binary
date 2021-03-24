@@ -33,22 +33,12 @@ print_modname() {
   len=`echo -n $MODNAME | wc -c`
   len=$((len + 2))
   local pounds=`printf "%${len}s" | tr ' ' '*'`
-  ui_print "=========================================================
-               [*] PANDORA'S BOX
-               [+] ANDROID SCRIPTS TOOLBOX"
-ui_print "=========================================================
-               [*] THANK YOU FOR TRYING 
-                   AND SUPPORTING LAZY and SWIFT!
-               [-] PLEASE SUPPORT OUR NEW PROJECT!"    
-ui_print "=========================================================
-               [*] CREDITS
-               [-] @TYTYDRACO
-               [-] @ALICE
-               [-] @AKIRA
-               [-] @EVERYONE WHO HELPED IN 
-                   THE DEVELOPMENT OF SWIFT AND LAZY
-               [-] @YOU :)
-=================================================================="
+  ui_print "$pounds"
+  ui_print " $MODNAME "
+  ui_print "$pounds"
+  ui_print "*******************"
+  ui_print " Powered by Magisk "
+  ui_print "*******************"
 }
 
 ##############
@@ -104,7 +94,7 @@ if is_legacy_script; then
 
   # Load install script
   . $TMPDIR/install.sh
-  
+
   # Callbacks
   print_modname
   on_install

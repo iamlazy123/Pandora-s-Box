@@ -110,21 +110,21 @@ do
 		ctl /sys/devices/system/cpu/cpufreq/policy4/$governor/down_rate_limit_us 5000
 		ctl /sys/devices/system/cpu/cpufreq/policy6/$governor/up_rate_limit_us 5000
 		ctl /sys/devices/system/cpu/cpufreq/policy6/$governor/down_rate_limit_us 5000
-		ctl "${CPU}$governor/rate_limit_us" 15000
+		ctl "${CPU}$governor/rate_limit_us" 5000
 		ctl "${CPU}$governor/hispeed_load" 90
 		ctl "${CPU}$governor/hispeed_freq" 0
 		ctl "${CPU}$governor/pl" 1
 		ctl "${CPU}$governor/iowait_boost_enable" 1
 done
 	
-	ctl $VM/vfs_cache_pressure 500
+	ctl $VM/vfs_cache_pressure 100
 	ctl $VM/dirty_background_ratio 10
-	ctl $VM/dirty_ratio 50
+	ctl $VM/dirty_ratio 20
 	ctl $VM/dirty_expire_centisecs 3000
 	ctl $VM/dirty_writeback_centisecs 3000
 	
 	#TOP-APP
-	ctl $ST_TOP/schedtune.boost 0
+	ctl $ST_TOP/schedtune.boost 1
 	ctl $ST_TOP/schedtune.prefer_idle 0
 	ctl $ST_FORE/schedtune.prefer_idle 0
 	

@@ -1,0 +1,349 @@
+#!/system/bin/sh
+# Terminal Magisk Mod Template
+# by veez21 @ xda-developers
+
+
+# Magisk Module ID **
+ID="toolbox8"
+
+# Detect root
+_name=$(basename $0)
+ls /data >/dev/null 2>&1 || { echo "$ID needs to run as root!"; echo "type 'su' then '$_name'"; exit 1; }
+
+# Import util_functions.sh
+[ -f /data/adb/magisk/util_functions.sh ] && . /data/adb/magisk/util_functions.sh || { echo "util_functions.sh not detected!"; exit 1; }
+
+# Magisk Mod Directory
+MOUNTPATH="/data/adb/modules"
+[ ! -d $MOUNTPATH ] && MOUNTPATH="/sbin/.magisk/img"
+MODDIR="$MOUNTPATH/$ID"
+[ ! -d $MODDIR ] && { echo "Module not detected!"; exit 1; }
+
+# Load mod-util.sh
+. $MODDIR/mod-util.sh || exit $?
+
+# Set Log Files
+mount -o remount,rw /cache 2>/dev/null
+mount -o rw,remount /cache 2>/dev/null
+# > Logs should go in this file
+LOG=$CACHELOC/$ID.log
+oldLOG=$CACHELOC/$ID-old.log
+# > Verbose output goes here
+VERLOG=$CACHELOC/$ID-verbose.log
+oldVERLOG=$CACHELOC/$ID-verbose-old.log
+
+# Start Logging verbosely
+mv -f $VERLOG $oldVERLOG 2>/dev/null; mv -f $LOG $oldLOG 2>/dev/null
+set -x 2>$VERLOG
+
+# Main
+# > You can start your MOD here.
+# > You can add functions, variables & etc.
+# > Rather than editing the default vars above.
+
+DEVMODE=""
+
+help_me(){
+  cat << EOF
+$MODTITLE $VER($REL)
+by $AUTHOR
+
+Usage: $_name
+   or: $_name [options]...
+
+Options:
+    -m [setting] [value]             modify setting without terminal GUI
+    -g [arg]                         get a range of settings and their
+                                     values matching [arg]
+    -l [system|secure|global]        list all settings for a namespace
+    -h                               show this message
+EOF
+exit
+}
+
+lazy_install(){
+[ "$DEVMODE" ] || clear
+  echo " ===== Lazy Tweaks ====="
+  echo ""
+  echo " Lazy Tweaks is a kernel tweak that aims to bring significant changes."
+  echo " Select you default mode for option 1 before executing lazy script"
+  echo ""
+  echo " 1 - ${W}Install Lazy Tweaks w/ app ${N}"
+  echo " 2 - ${W}Set Default Mode (for app version only)${N}"
+  echo " 3 - ${W}Install Lazy Tweaks no app${N}"
+  echo " x - ${Bl}Back to Main Menu${N}"
+  echo " r - ${Bl}Run Lazy now (may kill current terminal session)${N}"
+  echo " 0 - ${Bl}Exit${N}"
+  echo ""
+  echo -n "[CHOICE]: "
+  read choice
+  case "$choice" in
+    1) l1=$(cat /data/adb/modules/toolbox8/scripts/lazy); echo "$l1" > /data/adb/modules/toolbox8/system/bin/lazy; pm install /data/adb/modules/toolbox8/base.apk; pm install /data/adb/modules/toolbox8/toast.apk; if grep -q "sh /data/adb/modules/toolbox8/system/bin/lazy" "/data/adb/modules/toolbox8/service.sh"
+  then
+  echo ""
+  else
+  echo "sh /data/adb/modules/toolbox8/system/bin/lazy" >> /data/adb/modules/toolbox8/service.sh
+fi; echo "Lazy Tweak with App Successfully Installed "; sleep 1; lazy_install;;
+    2) default_mode;;
+    3) l1=$(cat /data/adb/modules/toolbox8/scripts/lazy1); echo "$l1" > /data/adb/modules/toolbox8/system/bin/lazy; echo "Ignore this error, this means there is no lazy app to uninstall"; sleep 2; pm uninstall com.lazy.profiles; if grep -q "sh /data/adb/modules/toolbox8/system/bin/lazy" "/data/adb/modules/toolbox8/service.sh"
+  then
+  echo ""
+  else
+  echo "sh /data/adb/modules/toolbox8/system/bin/lazy" >> /data/adb/modules/toolbox8/service.sh
+fi; echo "Lazy (no app) Successfully Installed"; sleep 1; lazy_install;;
+    x) menu;;
+    r) sh /data/adb/modules/toolbox8/system/bin/lazy; lazy_install;;
+    0) exit;;
+  esac
+}
+
+default_mode(){
+[ "$DEVMODE" ] || clear
+  echo " ===== Lazy Tweaks ====="
+  echo ""
+  echo " Select your desired mode across reboots."
+  echo ""
+  echo ""
+  echo " 1 - ${W}Automatic Mode${N}"
+  echo " 2 - ${W}Conservative${N}"
+  echo " 3 - ${W}Balanced${N}"
+  echo " 4 - ${W}Latency${N}"
+  echo " 5 - ${W}Throughput${N}"
+  echo " l - ${Bl}Back to Lazy Menu${N}"
+  echo " x - ${Bl}Back to Main Menu${N}"
+  echo " 0 - ${Bl}Exit${N}"
+  echo ""
+  echo -n "[CHOICE]: "
+  read choice
+  case "$choice" in
+   	1 ) sed -i "243i setprop persist.lazy.mode 1" /data/adb/modules/toolbox8/system/bin/lazy; echo "default mode is set to: Automatic"; sleep 1; default_mode;;
+	2 ) sed -i "243i setprop persist.lazy.mode 2" /data/adb/modules/toolbox8/system/bin/lazy; echo "default mode is set to: Conservative"; sleep 1; default_mode;;
+	3 ) sed -i "243i setprop persist.lazy.mode 3" /data/adb/modules/toolbox8/system/bin/lazy; echo "default mode is set to: Balanced"; sleep 1; default_mode;;
+	4 ) sed -i "243i setprop persist.lazy.mode 4" /data/adb/modules/toolbox8/system/bin/lazy; echo "default mode is set to: Latency"; sleep 1; default_mode;;
+	5 ) sed -i "243i setprop persist.lazy.mode 5" /data/adb/modules/toolbox8/system/bin/lazy; echo "default mode is set to: Throughput"; sleep 1; default_mode;;
+    l) lazy_install;;
+	x) menu;;
+    0) exit;;
+  esac
+}
+
+unlocker_install(){
+[ "$DEVMODE" ] || clear
+  echo " ===== FPS UNLOCKER/Device Spoofing tool ====="
+  echo ""
+  echo "Fake your device model to unlock options and features. (needs reboot)"
+  echo ""
+  echo ""
+  echo " 1 - ${W}PUBG fps mode unlocker${N}"
+  echo " 2 - ${W}CODM max frame rate unlocker + ultra (bp)${N}"
+  echo " 3 - ${W}BLACK DESERT 120 FPS${N}"
+  echo " 4 - ${W}Google Pixel 2 - Google Photos and Quality${N}"
+  echo " x - ${Bl}Back to Main Menu${N}"
+  echo " 0 - ${Bl}Exit${N}"
+  echo ""
+  echo -n "[CHOICE]: "
+  read choice
+  case "$choice" in
+   	1 ) echo "resetprop -n ro.product.model IN2025" >> /data/adb/modules/toolbox8/post-fs-data.sh; unlocker_install;;
+	2 ) echo "resetprop -n ro.product.model SO-52A" >> /data/adb/modules/toolbox8/post-fs-data.sh; unlocker_install;;
+	3 ) echo "resetprop -n ro.product.model SM-G975U" >> /data/adb/modules/toolbox8/post-fs-data.sh; unlocker_install;;
+	4 ) echo "resetprop -n ro.product.model Pixel 2 XL 
+ro.product.manufacturer=Google
+ro.opa.eligible_device=true" >> /data/adb/modules/toolbox8/post-fs-data.sh; unlocker_install;;
+	x) menu;;
+    0) exit;;
+  esac
+}
+
+swift_install(){
+[ "$DEVMODE" ] || clear
+  echo " ===== Swift ====="
+  echo ""
+  echo " A Rom Optimizer"
+  echo " Organizes task priorities/processes. Optimize memory, and pin apps to memory."
+  echo ""
+  echo " 1 - ${W}Install Swift${N}"
+  echo " x - ${Bl}Back to Main Menu${N}"
+  echo " r - ${Bl}Run Swift Now${N}"
+  echo " 0 - ${Bl}Exit${N}"
+  echo ""
+  echo -n "[CHOICE]: "
+  read choice
+  case "$choice" in
+    1) if grep -q "sh /data/adb/modules/toolbox8/scripts/swift" "/data/adb/modules/toolbox8/service.sh"
+  then
+  echo ""
+  else
+  echo "sh /data/adb/modules/toolbox8/scripts/swift" >> /data/adb/modules/toolbox8/service.sh
+fi; echo "Swift installed successfully"; sleep 1; swift_install;;
+    x) menu;;
+    r) sh /data/adb/modules/toolbox8/scripts/swift; swift_install;;
+    0) exit;;
+  esac
+}
+
+dexopt_install(){
+[ "$DEVMODE" ] || clear
+  echo " ===== Dexopt packages ====="
+  echo ""
+  echo "Run Dexopt packages service, may help improve speed and battery."
+  echo "Wait until a success message pops-out (3-15 mins), if your device starts heating up, after running dexopt packages, dexopt packages service is already in effect."
+  echo ""
+  echo " 1 - ${W}Run Dexopt Service - If not accessible error pops-out, not supported${N}"
+  echo " x - ${Bl}Back to Main Menu${N}"
+  echo " 0 - ${Bl}Exit${N}"
+  echo ""
+  echo -n "[CHOICE]: "
+  read choice
+  case "$choice" in
+    1) su -c cmd package bg-dexopt-job; sleep 1; dexopt_install;;
+    x) menu;;
+    0) exit;;
+  esac
+}
+
+kcal_install(){
+  [ "$DEVMODE" ] || clear
+  echo " ===== Kcal Presets ====="
+  echo ""
+  echo " 1 - ${W}X Reality Engine Kcal - brighter,warmer, vivid${N}"
+  echo " 2 - ${W}Harley Tech Kcal - darker, cooler, more screen details${N}"
+  echo " 3 - ${W}Vivid Screen Retention Fix - common retention fix preset, but more vivid${N}"
+  echo " 4 - ${W}Obsanity - Warm Harley Tech preset${N}"
+  echo " 5 - ${W}Deep Colorful Black - Amoled like dark preset${N}"
+  echo " 6 - ${W}Triluminos Display - Sony${N}"
+  echo " 7 - ${W}Fake AMOLED - Amoled wannabe${N}"
+  echo " 8 - ${W}Deep Black and White${N}"
+  echo " x - ${Bl}Back to Menu${N}"
+  echo " t - ${Bl}Try selected Kcal${N}"
+  echo " 0 - ${Bl}Exit${N}"
+  echo ""
+  echo -n "[CHOICE]: "
+  read choice
+  case "$choice" in
+    1) echo "echo '252 227 228' > /sys/devices/platform/kcal_ctrl.0/kcal
+echo '1' > /sys/devices/platform/kcal_ctrl.0/kcal_enable
+echo '271' > /sys/devices/platform/kcal_ctrl.0/kcal_sat
+echo '1536' > /sys/devices/platform/kcal_ctrl.0/kcal_hue
+echo '264' > /sys/devices/platform/kcal_ctrl.0/kcal_val
+echo '260' > /sys/devices/platform/kcal_ctrl.0/kcal_cont" > /data/adb/modules/toolbox8/scripts/kcal; echo "X Reality Engine Kcal installed"; sleep 1; kcal_install; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
+  then
+  echo ""
+  else
+  echo "sh /data/adb/modules/toolbox8/scripts/kcal" >> /data/adb/modules/toolbox8/service.sh
+  fi;;
+    2) echo "echo '236 240 255' > /sys/devices/platform/kcal_ctrl.0/kcal
+echo '1' > /sys/devices/platform/kcal_ctrl.0/kcal_enable
+echo '271' > /sys/devices/platform/kcal_ctrl.0/kcal_sat
+echo '0' > /sys/devices/platform/kcal_ctrl.0/kcal_hue
+echo '240' > /sys/devices/platform/kcal_ctrl.0/kcal_val
+echo '270 ' > /sys/devices/platform/kcal_ctrl.0/kcal_cont" > /data/adb/modules/toolbox8/scripts/kcal; echo "Harley Tech Kcal installed"; sleep 1; kcal_install; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
+  then
+  echo ""
+  else
+  echo "sh /data/adb/modules/toolbox8/scripts/kcal" >> /data/adb/modules/toolbox8/service.sh
+  fi;;
+    3) echo "echo '240 240 225' > /sys/devices/platform/kcal_ctrl.0/kcal
+echo '1' > /sys/devices/platform/kcal_ctrl.0/kcal_enable
+echo '255' > /sys/devices/platform/kcal_ctrl.0/kcal_sat
+echo '1520' > /sys/devices/platform/kcal_ctrl.0/kcal_hue
+echo '262' > /sys/devices/platform/kcal_ctrl.0/kcal_val
+echo '251 ' > /sys/devices/platform/kcal_ctrl.0/kcal_cont" > /data/adb/modules/toolbox8/scripts/kcal; echo "Vivid Screen Retention Fix installed"; sleep 1; kcal_install; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
+  then
+  echo ""
+  else
+  echo "sh /data/adb/modules/toolbox8/scripts/kcal" >> /data/adb/modules/toolbox8/service.sh
+  fi;;
+    4) echo "echo '245 245 256' > /sys/devices/platform/kcal_ctrl.0/kcal
+echo '1' > /sys/devices/platform/kcal_ctrl.0/kcal_enable
+echo '273' > /sys/devices/platform/kcal_ctrl.0/kcal_sat
+echo '0' > /sys/devices/platform/kcal_ctrl.0/kcal_hue
+echo '255' > /sys/devices/platform/kcal_ctrl.0/kcal_val
+echo '255 ' > /sys/devices/platform/kcal_ctrl.0/kcal_cont" > /data/adb/modules/toolbox8/scripts/kcal; echo "Obsanity installed"; sleep 1; kcal_install; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
+  then
+  echo ""
+  else
+  echo "sh /data/adb/modules/toolbox8/scripts/kcal" >> /data/adb/modules/toolbox8/service.sh
+  fi;;
+    5) echo "echo '230 232 255' > /sys/devices/platform/kcal_ctrl.0/kcal
+	echo "1" > /sys/devices/platform/kcal_ctrl.0/kcal_enable
+echo '268' > /sys/devices/platform/kcal_ctrl.0/kcal_cont
+echo '274' > /sys/devices/platform/kcal_ctrl.0/kcal_sat
+echo '0' > /sys/devices/platform/kcal_ctrl.0/kcal_hue
+echo '247' > /sys/devices/platform/kcal_ctrl.0/kcal_val
+echo '35' > /sys/devices/platform/kcal_ctrl.0/kcal_min" > /data/adb/modules/toolbox8/scripts/kcal; echo "Deep Colorful Black installed"; sleep 1; kcal_install; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
+  then
+  echo ""
+  else
+  echo "sh /data/adb/modules/toolbox8/scripts/kcal" >> /data/adb/modules/toolbox8/service.sh
+  fi;;
+    6) echo "echo '256 250 251' > /sys/devices/platform/kcal_ctrl.0/kcal
+	echo "1" > /sys/devices/platform/kcal_ctrl.0/kcal_enable
+echo '260' > /sys/devices/platform/kcal_ctrl.0/kcal_cont
+echo '255' > /sys/devices/platform/kcal_ctrl.0/kcal_sat
+echo '1526' > /sys/devices/platform/kcal_ctrl.0/kcal_hue
+echo '264' > /sys/devices/platform/kcal_ctrl.0/kcal_val
+echo '35' > /sys/devices/platform/kcal_ctrl.0/kcal_min" > /data/adb/modules/toolbox8/scripts/kcal; echo "Triluminos Display - Sony installed"; sleep 1; kcal_install; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
+  then
+  echo ""
+  else
+  echo "sh /data/adb/modules/toolbox8/scripts/kcal" >> /data/adb/modules/toolbox8/service.sh
+  fi;;
+    7) echo "echo "1" > /sys/devices/platform/kcal_ctrl.0/kcal_enable
+echo '225 225 237' > /sys/devices/platform/kcal_ctrl.0/kcal
+echo '264' > /sys/devices/platform/kcal_ctrl.0/kcal_cont
+echo '0' > /sys/devices/platform/kcal_ctrl.0/kcal_hue
+echo '35' > /sys/devices/platform/kcal_ctrl.0/kcal_min
+echo '277' > /sys/devices/platform/kcal_ctrl.0/kcal_sat
+echo '250' > /sys/devices/platform/kcal_ctrl.0/kcal_val" > /data/adb/modules/toolbox8/scripts/kcal; echo "Fake AMOLED Kcal installed"; sleep 1; kcal_install; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
+  then
+  echo ""
+  else
+  echo "sh /data/adb/modules/toolbox8/scripts/kcal" >> /data/adb/modules/toolbox8/service.sh
+  fi;;
+    8) echo "echo '1' > /sys/devices/platform/kcal ctrl.0/kcal_enable
+echo '0' > /sys/devices/platform/kcal_ctrl.0/kcal_invert 
+echo '35' > /sys/devices/platform/kcal ctrl.0/kcalmin 
+echo '250 250 256' > /sys/devices/platform/kcal_ctrl.0/kcal 
+echo '279' > /sys/devices/platform/kcal_ctrl.0/kcal_sat 
+echo '1526' > /sys/devices/platform/kcal_ctrl.0/kcal_hue 
+echo '261' > /sys/devices/platform/kcal_ctrl.0/kcal_val 
+echo '266' > /sys/devices/platform/kcal_ctrl.0/kcal_cont"  > /data/adb/modules/toolbox8/scripts/kcal; echo "Deep Black and White Kcal installed"; sleep 1; kcal_install; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
+  then
+  echo ""
+  else
+  echo "sh /data/adb/modules/toolbox8/scripts/kcal" >> /data/adb/modules/toolbox8/service.sh
+  fi;;
+    t) sh /data/adb/modules/toolbox8/scripts/kcal; kcal_install;;
+    x) menu;;
+    0) exit;;
+  esac
+}
+
+menu(){
+[ "$DEVMODE" ] || clear
+  mod_head
+  echo ""
+  echo " 1 - ${W}KCAL${N}"
+  echo " 2 - ${W}SWIFT${N}"
+  echo " 3 - ${W}LAZY${N}"
+  echo " 4 - ${W}UNLOCKER${N}"
+  echo " 5 - ${W}DEXOPT PACKAGES${N}"
+  echo " 0 - ${Bl}Exit${N}"
+  echo ""
+  echo -n "[CHOICE]: "
+  read choice
+  case "$choice" in
+    1) clear && kcal_install;;
+    2) clear && swift_install;;
+    3) clear && lazy_install;;
+    4) clear && unlocker_install;;
+    5) clear && dexopt_install;;
+    0) exit;;
+    *) abort Invalid;;
+  esac
+}
+
+menu
+exit $?
+

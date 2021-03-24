@@ -54,7 +54,7 @@ kmsg "--------------------------------------------------------------------------
 if [ -d $KERNEL ]; then
 ctl $KERNEL/perf_cpu_time_max_percent 3
 ctl $KERNEL/sched_min_task_util_for_boost_colocation 0
-ctl $KERNEL/sched_autogroup_enabled 0
+ctl $KERNEL/sched_autogroup_enabled 1
 ctl $KERNEL/sched_child_runs_first 1
 ctl $KERNEL/sched_latency_ns 1000000
 ctl $KERNEL/sched_min_granularity_ns 100000
@@ -78,7 +78,7 @@ fi
 	ctl "${queue}iosched/slice_idle" 0
 	ctl "${queue}iosched/low_latency" 1
 	ctl "${queue}iosched/group_idle" 0
-	ctl "${queue}iosched/quantum" 16
+	ctl "${queue}iosched/quantum" 4
 	ctl "${queue}iosched/slice_async_rq" 1
 	ctl "${queue}iosched/back_seek_max" 214748364
 	done
@@ -104,13 +104,13 @@ do
 			break
 		fi
 	done
-		ctl /sys/devices/system/cpu/cpufreq/policy0/$governor/up_rate_limit_us 10000
-		ctl /sys/devices/system/cpu/cpufreq/policy0/$governor/down_rate_limit_us 15000
-		ctl /sys/devices/system/cpu/cpufreq/policy4/$governor/up_rate_limit_us 10000
-		ctl /sys/devices/system/cpu/cpufreq/policy4/$governor/down_rate_limit_us 15000
-		ctl /sys/devices/system/cpu/cpufreq/policy6/$governor/up_rate_limit_us 10000
-		ctl /sys/devices/system/cpu/cpufreq/policy6/$governor/down_rate_limit_us 15000
-		ctl "${CPU}$governor/rate_limit_us" 15000
+		ctl /sys/devices/system/cpu/cpufreq/policy0/$governor/up_rate_limit_us 2500
+		ctl /sys/devices/system/cpu/cpufreq/policy0/$governor/down_rate_limit_us 3000
+		ctl /sys/devices/system/cpu/cpufreq/policy4/$governor/up_rate_limit_us 2500
+		ctl /sys/devices/system/cpu/cpufreq/policy4/$governor/down_rate_limit_us 3000
+		ctl /sys/devices/system/cpu/cpufreq/policy6/$governor/up_rate_limit_us 3000
+		ctl /sys/devices/system/cpu/cpufreq/policy6/$governor/down_rate_limit_us 2500
+		ctl "${CPU}$governor/rate_limit_us" 2500
 		ctl "${CPU}$governor/hispeed_load" 90
 		ctl "${CPU}$governor/hispeed_freq" 0
 		ctl "${CPU}$governor/pl" 1

@@ -20,5 +20,5 @@ wait_until_login
 rm -rf /sdcard/android/lazy.log
 rm -rf /sdcard/android/swift.log
 rm -rf /sdcard/android/pandora.log
-# Setup tweaks
-pandora
+# Setup scripts
+sh /data/adb/modules/toolbox8/scripts/kcal
