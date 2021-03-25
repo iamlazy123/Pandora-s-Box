@@ -151,7 +151,7 @@ ctl /sys/module/cpu_input_boost/parameters/input_boost_freq_hp 1324000
 ctl /sys/module/cpu_input_boost/parameters/input_boost_duration 80
 ctl /sys/module/cpu_input_boost/parameters/input_boost_freq_lp 1324000
 ctl /sys/module/cpu_boost/parameters/input_boost_freq "0:1400000 1:0 2:0 3:0 4:0 5:0 6:0 7:0"
-ctl /sys/module/cpu_boost/parameters/input_boost_ms 58
+ctl /sys/module/cpu_boost/parameters/input_boost_ms 80
 ctl /sys/kernel/fast_charge/force_fast_charge 1
 
 	#based from zenith kernel's core control
@@ -189,6 +189,35 @@ ctl /dev/cpuset/system-background/uclamp.max 40
 ctl /dev/cpuset/system-background/uclamp.min 0
 ctl /dev/cpuset/system-background/uclamp.boosted 0
 ctl /dev/cpuset/system-background/uclamp.latency_sensitive 0
+
+chmod 000 /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq
+chmod 000 /sys/devices/system/cpu/cpu1/cpufreq/cpuinfo_max_freq
+chmod 000 /sys/devices/system/cpu/cpu2/cpufreq/cpuinfo_max_freq
+chmod 000 /sys/devices/system/cpu/cpu3/cpufreq/cpuinfo_max_freq
+chmod 000 /sys/devices/system/cpu/cpu4/cpufreq/cpuinfo_max_freq
+chmod 000 /sys/devices/system/cpu/cpu5/cpufreq/cpuinfo_max_freq
+chmod 000 /sys/devices/system/cpu/cpu6/cpufreq/cpuinfo_max_freq
+chmod 000 /sys/devices/system/cpu/cpu7/cpufreq/cpuinfo_max_freq
+
+chmod 000 /sys/devices/system/cpu/cpu0/cpu_capacity
+chmod 000 /sys/devices/system/cpu/cpu1/cpu_capacity
+chmod 000 /sys/devices/system/cpu/cpu2/cpu_capacity
+chmod 000 /sys/devices/system/cpu/cpu3/cpu_capacity
+chmod 000 /sys/devices/system/cpu/cpu4/cpu_capacity
+chmod 000 /sys/devices/system/cpu/cpu5/cpu_capacity
+chmod 000 /sys/devices/system/cpu/cpu6/cpu_capacity
+chmod 000 /sys/devices/system/cpu/cpu7/cpu_capacity
+
+chmod 000 /sys/devices/system/cpu/cpu0/topology/physical_package_id
+chmod 000 /sys/devices/system/cpu/cpu1/topology/physical_package_id
+chmod 000 /sys/devices/system/cpu/cpu2/topology/physical_package_id
+chmod 000 /sys/devices/system/cpu/cpu3/topology/physical_package_id
+chmod 000 /sys/devices/system/cpu/cpu4/topology/physical_package_id
+chmod 000 /sys/devices/system/cpu/cpu5/topology/physical_package_id
+chmod 000 /sys/devices/system/cpu/cpu6/topology/physical_package_id
+chmod 000 /sys/devices/system/cpu/cpu7/topology/physical_package_id
+
+echo 0 > /sys/devices/system/cpu/cpu0/core_ctl/enable
 
 set_sched_migrate "50" "25" "999" "888"
 set_sched_migrate "50 90" "25 50" "999" "888"

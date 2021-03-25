@@ -6,6 +6,28 @@ kmsg() {
 	echo -e "[-]$@" >> $SLOG
 	echo -e "[-]$@"
 }
+ctl() {
+	# Bail out if file does not exist
+	[[ ! -f "$1" ]] && return 1
+
+	# Fetch the current key value
+	local curval=`cat "$1" 2> /dev/null`
+	
+	# Bail out if value is already set
+	[[ "$curval" == "$2" ]] && return 1
+	
+	# Make file writable in case it is not already
+	chmod 777 "$1" 2> /dev/null
+
+	# Write the new value and bail if there's an error
+	if ! echo "$2" > "$1" 2> /dev/null
+	then
+		return 1
+	fi
+
+	# Log the success
+	kmsg "$1 $curval -> $2"
+}
 # $1:content
 write_panel()
 {
@@ -413,13 +435,13 @@ kmsg "=======================================================================
     
     for cg in stune cpuset; do
         for p in $(cat /dev/$cg/top-app/tasks); do
-            echo $p > /dev/$cg/foreground/tasks
+            ctl /dev/$cg/foreground/tasks "$p"
         done
     done
     
 # pin kworker on little
 for f in $(find /sys/devices/virtual/workqueue "cpumask"); do
-    echo 0f > $f
+    ctl $f "0f"
 done
 
 # End of uperf codes from matt yang

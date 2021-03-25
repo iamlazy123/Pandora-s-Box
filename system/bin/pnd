@@ -116,11 +116,11 @@ default_mode(){
   echo -n "[CHOICE]: "
   read choice
   case "$choice" in
-   	1 ) sed -i "243i setprop persist.lazy.mode 1" /data/adb/modules/toolbox8/system/bin/lazy; echo "default mode is set to: Automatic"; sleep 1; default_mode;;
-	2 ) sed -i "243i setprop persist.lazy.mode 2" /data/adb/modules/toolbox8/system/bin/lazy; echo "default mode is set to: Conservative"; sleep 1; default_mode;;
-	3 ) sed -i "243i setprop persist.lazy.mode 3" /data/adb/modules/toolbox8/system/bin/lazy; echo "default mode is set to: Balanced"; sleep 1; default_mode;;
-	4 ) sed -i "243i setprop persist.lazy.mode 4" /data/adb/modules/toolbox8/system/bin/lazy; echo "default mode is set to: Latency"; sleep 1; default_mode;;
-	5 ) sed -i "243i setprop persist.lazy.mode 5" /data/adb/modules/toolbox8/system/bin/lazy; echo "default mode is set to: Throughput"; sleep 1; default_mode;;
+   	1 ) sed -i "272i setprop persist.lazy.mode 1" /data/adb/modules/toolbox8/system/bin/lazy; echo "default mode is set to: Automatic"; sleep 1; default_mode;;
+	2 ) sed -i "272i setprop persist.lazy.mode 2" /data/adb/modules/toolbox8/system/bin/lazy; echo "default mode is set to: Conservative"; sleep 1; default_mode;;
+	3 ) sed -i "272i setprop persist.lazy.mode 3" /data/adb/modules/toolbox8/system/bin/lazy; echo "default mode is set to: Balanced"; sleep 1; default_mode;;
+	4 ) sed -i "272i setprop persist.lazy.mode 4" /data/adb/modules/toolbox8/system/bin/lazy; echo "default mode is set to: Latency"; sleep 1; default_mode;;
+	5 ) sed -i "272i setprop persist.lazy.mode 5" /data/adb/modules/toolbox8/system/bin/lazy; echo "default mode is set to: Throughput"; sleep 1; default_mode;;
     l) lazy_install;;
 	x) menu;;
     0) exit;;
@@ -226,81 +226,81 @@ echo '1' > /sys/devices/platform/kcal_ctrl.0/kcal_enable
 echo '271' > /sys/devices/platform/kcal_ctrl.0/kcal_sat
 echo '1536' > /sys/devices/platform/kcal_ctrl.0/kcal_hue
 echo '264' > /sys/devices/platform/kcal_ctrl.0/kcal_val
-echo '260' > /sys/devices/platform/kcal_ctrl.0/kcal_cont" > /data/adb/modules/toolbox8/scripts/kcal; echo "X Reality Engine Kcal installed"; sleep 1; kcal_install; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
+echo '260' > /sys/devices/platform/kcal_ctrl.0/kcal_cont" > /data/adb/modules/toolbox8/scripts/kcal; echo "X Reality Engine Kcal installed"; sleep 1; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
   then
   echo ""
   else
   echo "sh /data/adb/modules/toolbox8/scripts/kcal" >> /data/adb/modules/toolbox8/service.sh
-  fi;;
+  fi; kcal_install;;
     2) echo "echo '236 240 255' > /sys/devices/platform/kcal_ctrl.0/kcal
 echo '1' > /sys/devices/platform/kcal_ctrl.0/kcal_enable
 echo '271' > /sys/devices/platform/kcal_ctrl.0/kcal_sat
 echo '0' > /sys/devices/platform/kcal_ctrl.0/kcal_hue
 echo '240' > /sys/devices/platform/kcal_ctrl.0/kcal_val
-echo '270 ' > /sys/devices/platform/kcal_ctrl.0/kcal_cont" > /data/adb/modules/toolbox8/scripts/kcal; echo "Harley Tech Kcal installed"; sleep 1; kcal_install; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
+echo '270 ' > /sys/devices/platform/kcal_ctrl.0/kcal_cont" > /data/adb/modules/toolbox8/scripts/kcal; echo "Harley Tech Kcal installed"; sleep 1; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
   then
   echo ""
   else
   echo "sh /data/adb/modules/toolbox8/scripts/kcal" >> /data/adb/modules/toolbox8/service.sh
-  fi;;
+  fi; kcal_install;;
     3) echo "echo '240 240 225' > /sys/devices/platform/kcal_ctrl.0/kcal
 echo '1' > /sys/devices/platform/kcal_ctrl.0/kcal_enable
 echo '255' > /sys/devices/platform/kcal_ctrl.0/kcal_sat
 echo '1520' > /sys/devices/platform/kcal_ctrl.0/kcal_hue
 echo '262' > /sys/devices/platform/kcal_ctrl.0/kcal_val
-echo '251 ' > /sys/devices/platform/kcal_ctrl.0/kcal_cont" > /data/adb/modules/toolbox8/scripts/kcal; echo "Vivid Screen Retention Fix installed"; sleep 1; kcal_install; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
+echo '251 ' > /sys/devices/platform/kcal_ctrl.0/kcal_cont" > /data/adb/modules/toolbox8/scripts/kcal; echo "Vivid Screen Retention Fix installed"; sleep 1; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
   then
   echo ""
   else
   echo "sh /data/adb/modules/toolbox8/scripts/kcal" >> /data/adb/modules/toolbox8/service.sh
-  fi;;
+  fi; kcal_install;;
     4) echo "echo '245 245 256' > /sys/devices/platform/kcal_ctrl.0/kcal
 echo '1' > /sys/devices/platform/kcal_ctrl.0/kcal_enable
 echo '273' > /sys/devices/platform/kcal_ctrl.0/kcal_sat
 echo '0' > /sys/devices/platform/kcal_ctrl.0/kcal_hue
 echo '255' > /sys/devices/platform/kcal_ctrl.0/kcal_val
-echo '255 ' > /sys/devices/platform/kcal_ctrl.0/kcal_cont" > /data/adb/modules/toolbox8/scripts/kcal; echo "Obsanity installed"; sleep 1; kcal_install; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
+echo '255 ' > /sys/devices/platform/kcal_ctrl.0/kcal_cont" > /data/adb/modules/toolbox8/scripts/kcal; echo "Obsanity installed"; sleep 1; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
   then
   echo ""
   else
   echo "sh /data/adb/modules/toolbox8/scripts/kcal" >> /data/adb/modules/toolbox8/service.sh
-  fi;;
+  fi; kcal_install;;
     5) echo "echo '230 232 255' > /sys/devices/platform/kcal_ctrl.0/kcal
 	echo "1" > /sys/devices/platform/kcal_ctrl.0/kcal_enable
 echo '268' > /sys/devices/platform/kcal_ctrl.0/kcal_cont
 echo '274' > /sys/devices/platform/kcal_ctrl.0/kcal_sat
 echo '0' > /sys/devices/platform/kcal_ctrl.0/kcal_hue
 echo '247' > /sys/devices/platform/kcal_ctrl.0/kcal_val
-echo '35' > /sys/devices/platform/kcal_ctrl.0/kcal_min" > /data/adb/modules/toolbox8/scripts/kcal; echo "Deep Colorful Black installed"; sleep 1; kcal_install; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
+echo '35' > /sys/devices/platform/kcal_ctrl.0/kcal_min" > /data/adb/modules/toolbox8/scripts/kcal; echo "Deep Colorful Black installed"; sleep 1; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
   then
   echo ""
   else
   echo "sh /data/adb/modules/toolbox8/scripts/kcal" >> /data/adb/modules/toolbox8/service.sh
-  fi;;
+  fi; kcal_install;;
     6) echo "echo '256 250 251' > /sys/devices/platform/kcal_ctrl.0/kcal
 	echo "1" > /sys/devices/platform/kcal_ctrl.0/kcal_enable
 echo '260' > /sys/devices/platform/kcal_ctrl.0/kcal_cont
 echo '255' > /sys/devices/platform/kcal_ctrl.0/kcal_sat
 echo '1526' > /sys/devices/platform/kcal_ctrl.0/kcal_hue
 echo '264' > /sys/devices/platform/kcal_ctrl.0/kcal_val
-echo '35' > /sys/devices/platform/kcal_ctrl.0/kcal_min" > /data/adb/modules/toolbox8/scripts/kcal; echo "Triluminos Display - Sony installed"; sleep 1; kcal_install; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
+echo '35' > /sys/devices/platform/kcal_ctrl.0/kcal_min" > /data/adb/modules/toolbox8/scripts/kcal; echo "Triluminos Display - Sony installed"; sleep 1; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
   then
   echo ""
   else
   echo "sh /data/adb/modules/toolbox8/scripts/kcal" >> /data/adb/modules/toolbox8/service.sh
-  fi;;
+  fi; kcal_install;;
     7) echo "echo "1" > /sys/devices/platform/kcal_ctrl.0/kcal_enable
 echo '225 225 237' > /sys/devices/platform/kcal_ctrl.0/kcal
 echo '264' > /sys/devices/platform/kcal_ctrl.0/kcal_cont
 echo '0' > /sys/devices/platform/kcal_ctrl.0/kcal_hue
 echo '35' > /sys/devices/platform/kcal_ctrl.0/kcal_min
 echo '277' > /sys/devices/platform/kcal_ctrl.0/kcal_sat
-echo '250' > /sys/devices/platform/kcal_ctrl.0/kcal_val" > /data/adb/modules/toolbox8/scripts/kcal; echo "Fake AMOLED Kcal installed"; sleep 1; kcal_install; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
+echo '250' > /sys/devices/platform/kcal_ctrl.0/kcal_val" > /data/adb/modules/toolbox8/scripts/kcal; echo "Fake AMOLED Kcal installed"; sleep 1; if grep -q "sh /data/adb/modules/toolbox8/scripts/kcal" "/data/adb/modules/toolbox8/service.sh"
   then
   echo ""
   else
   echo "sh /data/adb/modules/toolbox8/scripts/kcal" >> /data/adb/modules/toolbox8/service.sh
-  fi;;
+  fi; kcal_install;;
     8) echo "echo '1' > /sys/devices/platform/kcal ctrl.0/kcal_enable
 echo '0' > /sys/devices/platform/kcal_ctrl.0/kcal_invert 
 echo '35' > /sys/devices/platform/kcal ctrl.0/kcalmin 
